@@ -1,4 +1,5 @@
 import type * as coda from "@codahq/packs-sdk";
+import type * as types from "./types";
 
 /**
  * You can put the complicated business logic of your pack in this file,
@@ -38,13 +39,7 @@ async function callApi(
   return response;
 }
 
-function concatenateAddress(address: {
-  street: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: String;
-}) {
+function concatenateAddress(address: types.CopperAddress) {
   let concatenatedAddress: string = "";
   if (address.street) concatenatedAddress += address.street + ", ";
   if (address.city) concatenatedAddress += address.city + ", ";

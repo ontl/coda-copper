@@ -18,3 +18,11 @@
 //   fullName: string;
 //   createdAt: string;
 // }
+
+export interface CopperAddress {
+  street: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: String;
+}
