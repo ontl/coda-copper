@@ -3,3 +3,4 @@
 node_modules
 .coda-pack.json
 **/.DS_Store
+_upload_build
