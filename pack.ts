@@ -26,8 +26,8 @@ pack.setUserAuthentication({
  */
 pack.addSyncTable({
   name: "Opportunities",
-  identityName: "Opportunity",
   schema: schemas.OpportunitySchema,
+  identityName: "Opportunity",
   formula: {
     name: "SyncOpportunities",
     description: "Sync opportunities from Copper",
@@ -43,8 +43,8 @@ pack.addSyncTable({
  */
 pack.addSyncTable({
   name: "Companies",
-  identityName: "Company",
   schema: schemas.CompanySchema,
+  identityName: "Company",
   formula: {
     name: "SyncCompanies",
     description: "Sync companies from Copper",

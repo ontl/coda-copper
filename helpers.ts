@@ -58,8 +58,21 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     page_size: pageSize,
     sort_by: "date_created",
   });
+
+  let opportunities = [];
+  for (let opportunity of response.body) {
+    // prepare reference to companies table
+    if (opportunity.company_id) {
+      opportunity.company = {
+        companyId: opportunity.company_id,
+        companyName: opportunity.company_name,
+      };
+    }
+    console.log(JSON.stringify(opportunity.company));
+    opportunities.push(opportunity);
+  }
   return {
-    result: response.body,
+    result: opportunities,
     continuation: undefined,
   };
 }
