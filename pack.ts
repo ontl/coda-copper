@@ -21,6 +21,10 @@ pack.setUserAuthentication({
     "https://developer.copper.com/introduction/authentication.html",
 });
 
+/* -------------------------------------------------------------------------- */
+/*                                 Sync Tables                                */
+/* -------------------------------------------------------------------------- */
+
 /**
  * Syncs opportunities from Copper
  */
