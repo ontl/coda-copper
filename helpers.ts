@@ -8,7 +8,7 @@ import type * as types from "./types";
  */
 
 const baseUrl = "https://api.copper.com/developer_api/v1/";
-const pageSize = 25;
+const pageSize = 50;
 
 /* -------------------------------------------------------------------------- */
 /*                              Helper Functions                              */
@@ -25,6 +25,7 @@ async function callApi(
   // https://coda.github.io/packs-sdk/reference/sdk/interfaces/CustomAuthentication/
   const apiKeyToken = "{{apiKey-" + context.invocationToken + "}}";
   const emailToken = "{{email-" + context.invocationToken + "}}";
+  console.log(JSON.stringify(payload));
   const response = await context.fetcher.fetch({
     method: method,
     url: baseUrl + endpoint,
@@ -54,11 +55,20 @@ function concatenateAddress(address: types.CopperAddress) {
 /* -------------------------------------------------------------------------- */
 
 export async function syncOpportunities(context: coda.SyncExecutionContext) {
+  // If there is a previous continuation, grab its page number. Otherwise,
+  // start at page 1.
+  let pageNumber: number =
+    (context.sync.continuation?.pageNumber as number) || 1;
+
+  // Grab a page of results
   let response = await callApi(context, "opportunities/search", "POST", {
     page_size: pageSize,
     sort_by: "date_created",
+    sort_direction: "desc",
+    page_number: pageNumber,
   });
 
+  // Process the results
   let opportunities = [];
   for (let opportunity of response.body) {
     // prepare reference to companies table
@@ -71,9 +81,18 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     console.log(JSON.stringify(opportunity.company));
     opportunities.push(opportunity);
   }
+
+  // If we got a full page of results, that means there are probably more results
+  // on the next page. Set up a continuation to grab the next page if so.
+  let nextContinuation = undefined;
+  if ((opportunities.length = pageSize))
+    nextContinuation = {
+      pageNumber: pageNumber + 1,
+    };
+
   return {
     result: opportunities,
-    continuation: undefined,
+    continuation: nextContinuation,
   };
 }
 
