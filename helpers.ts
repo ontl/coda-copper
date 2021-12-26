@@ -1,14 +1,8 @@
 import type * as coda from "@codahq/packs-sdk";
 import type * as types from "./types";
 
-/**
- * You can put the complicated business logic of your pack in this file,
- * or multiple files, to nicely separate your pack's logic from the
- * high-level definition in pack.ts
- */
-
-const baseUrl = "https://api.copper.com/developer_api/v1/";
-const pageSize = 50;
+const BASE_URL = "https://api.copper.com/developer_api/v1/";
+const PAGE_SIZE = 50; // max accepted by the API is 200, but that can crash Pack execution
 
 /* -------------------------------------------------------------------------- */
 /*                              Helper Functions                              */
@@ -17,10 +11,10 @@ const pageSize = 50;
 /**
  * Generic wrapper for the Copper API that takes care of common things like auth.
  * Common payload parameters:
- * page_size: number of items to return per page
- * page_number: page number to return
+ * page_size: default 20, max 200, typically just pass PAGE_SIZE constant
+ * page_number: default 1, starts at 1
  * sort_by: the field to sort by
- * sort_order: asc or desc
+ * sort_order: asc (default) or desc
  */
 async function callApi(
   context: coda.ExecutionContext,
@@ -35,7 +29,7 @@ async function callApi(
   const emailToken = "{{email-" + context.invocationToken + "}}";
   const response = await context.fetcher.fetch({
     method: method,
-    url: baseUrl + endpoint,
+    url: BASE_URL + endpoint,
     headers: {
       "X-PW-Application": "developer_api",
       "Content-Type": "application/json",
@@ -58,6 +52,15 @@ function concatenateAddress(address: types.CopperAddress) {
   if (address?.country) concatenatedAddress += address.country + ", ";
   if (address?.postal_code) concatenatedAddress += address.postal_code + ", ";
   return concatenatedAddress.slice(0, -2);
+}
+
+/**
+ * Gets the Copper account ID for use in constructing user-facing URLs. Note that
+ * this is the id of the users's organization, not just the specific user's account.
+ */
+async function getAccountId(context: coda.ExecutionContext) {
+  const response = await callApi(context, "accounts");
+  return response.body.id;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -100,7 +103,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
 
   // Grab a page of results
   let response = await callApi(context, "opportunities/search", "POST", {
-    page_size: pageSize,
+    page_size: PAGE_SIZE,
     page_number: pageNumber,
     sort_by: "date_created",
     sort_direction: "desc",
@@ -134,7 +137,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
   };
   nextContinuation.userEmails = userEmails;
   nextContinuation.userNames = userNames;
-  if ((opportunities.length = pageSize))
+  if ((opportunities.length = PAGE_SIZE))
     nextContinuation.pageNumber = pageNumber + 1;
 
   return {
@@ -154,7 +157,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
 
   // Grab a page of results
   let response = await callApi(context, "companies/search", "POST", {
-    page_size: pageSize,
+    page_size: PAGE_SIZE,
     page_number: pageNumber,
     sort_by: "name",
   });
@@ -168,7 +171,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = undefined;
-  if ((companies.length = pageSize))
+  if ((companies.length = PAGE_SIZE))
     nextContinuation = {
       pageNumber: pageNumber + 1,
     };
