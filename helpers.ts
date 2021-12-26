@@ -63,6 +63,21 @@ async function getAccountId(context: coda.ExecutionContext) {
   return response.body.id;
 }
 
+/**
+ * Generates human-ready URLs for Copper entities
+ * @param copperAccountId, pulled once via getAccountId()
+ * @param entityType, using Copper's URL naming (company = "organization", opportunity = "deal", person = "contact")
+ * @param entityId
+ * @returns URL of the entity
+ */
+async function getCopperUrl(
+  copperAccountId: string,
+  entityType: "organization" | "deal" | "contact",
+  entityId: string
+) {
+  return `https://app.copper.com/companies/${copperAccountId}/app#/${entityType}/${entityId}`;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                            Sync Table Functions                            */
 /* -------------------------------------------------------------------------- */
