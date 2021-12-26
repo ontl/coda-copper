@@ -15,7 +15,12 @@ const pageSize = 50;
 /* -------------------------------------------------------------------------- */
 
 /**
- * Generic wrapper for the Copper API that takes care of common things like auth
+ * Generic wrapper for the Copper API that takes care of common things like auth.
+ * Common payload parameters:
+ * page_size: number of items to return per page
+ * page_number: page number to return
+ * sort_by: the field to sort by
+ * sort_order: asc or desc
  */
 async function callApi(
   context: coda.ExecutionContext,
@@ -63,6 +68,31 @@ function concatenateAddress(address: types.CopperAddress) {
  * Syncs opportunities from Copper
  */
 export async function syncOpportunities(context: coda.SyncExecutionContext) {
+  // Get a list of Copper users, so we can map their email addresses to their
+  // ids when they appear as assignees of an opportunity.
+  let userEmails = {};
+  let userNames = {};
+  // First, check if we already have this list from a previous continuation
+  if (
+    context.sync.continuation?.userEmails &&
+    context.sync.continuation?.userNames
+  ) {
+    userEmails = context.sync.continuation.userEmails;
+    userNames = context.sync.continuation.userNames;
+  } else {
+    // If not, get it from Copper
+    const response = await callApi(context, "users/search", "POST", {
+      page_size: 200, // set arbitrarily high to get all users (Copper API max = 200)
+    });
+    // Ideally we would store this as an array of user objects, but the Coda SDK's
+    // Continuation object doesn't support arrays. So instead we'll store it as a
+    // couple of objects: one for emails, and one for names.
+    for (const user of response.body) {
+      userEmails[user.id] = user.email;
+      userNames[user.id] = user.name;
+    }
+  }
+
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
   let pageNumber: number =
@@ -85,6 +115,11 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
         companyId: opportunity.company_id,
         companyName: opportunity.company_name,
       };
+      opportunity.assignee = {
+        copperUserId: opportunity.assignee_id,
+        email: userEmails[opportunity.assignee_id],
+        name: userNames[opportunity.assignee_id],
+      };
     }
     // console.log(JSON.stringify(opportunity.company));
     opportunities.push(opportunity);
@@ -92,11 +127,15 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
-  let nextContinuation = undefined;
+  let nextContinuation = {
+    pageNumber: undefined,
+    userEmails: {},
+    userNames: {},
+  };
+  nextContinuation.userEmails = userEmails;
+  nextContinuation.userNames = userNames;
   if ((opportunities.length = pageSize))
-    nextContinuation = {
-      pageNumber: pageNumber + 1,
-    };
+    nextContinuation.pageNumber = pageNumber + 1;
 
   return {
     result: opportunities,

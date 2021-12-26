@@ -1,4 +1,16 @@
 import * as coda from "@codahq/packs-sdk";
+
+const CopperUser = coda.makeObjectSchema({
+  codaType: coda.ValueHintType.Person,
+  properties: {
+    email: { type: coda.ValueType.String, required: true },
+    name: { type: coda.ValueType.String },
+    copperUserId: { type: coda.ValueType.String },
+  },
+  primary: "name",
+  id: "email",
+});
+
 export const CompanySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "companyId",
@@ -53,6 +65,7 @@ export const CompanySchema = coda.makeObjectSchema({
       description: "Assignee ID on Copper",
       fromKey: "assignee_id",
     },
+    asignee: CopperUser,
     contactTypeId: {
       type: coda.ValueType.String,
       description: "Contact type ID on Copper",
@@ -159,10 +172,10 @@ export const OpportunitySchema = coda.makeObjectSchema({
       fromKey: "name",
     },
     assigneeId: {
-      // TODO: Connect this to company assignees
       type: coda.ValueType.String,
       fromKey: "assignee_id",
     },
+    assignee: CopperUser,
     closeDate: {
       type: coda.ValueType.String,
       codaType: coda.ValueHintType.Date,
