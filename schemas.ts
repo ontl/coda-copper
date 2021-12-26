@@ -1,153 +1,21 @@
 import * as coda from "@codahq/packs-sdk";
-
-export const OpportunitySchema = coda.makeObjectSchema({
-  type: coda.ValueType.Object,
-  id: "opportunityId",
-  primary: "opportunityName",
-  featured: ["companyName", "status", "monetaryValue", "closeDate"],
-  properties: {
-    opportunityId: {
-      type: coda.ValueType.String,
-      description: "Copper ID of the opportunity",
-      required: true,
-      fromKey: "id",
-    },
-    opportunityName: {
-      type: coda.ValueType.String,
-      description: "Name of the opportunity",
-      fromKey: "name",
-    },
-    assigneeId: {
-      // TODO: Connect this to company assignees
-      type: coda.ValueType.String,
-      fromKey: "assignee_id",
-    },
-    closeDate: {
-      type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Date,
-      description: "Close date of the opportunity",
-      fromKey: "close_date",
-    },
-    companyId: {
-      // TODO: Make this a reference to company
-      type: coda.ValueType.String,
-      description: "Id of the related company",
-      fromKey: "company_id",
-    },
-    companyName: {
-      type: coda.ValueType.String,
-      description: "Name of the related company",
-      fromKey: "company_name",
-    },
-    customerSourceId: {
-      // TODO: Figure out what this is haha
-      type: coda.ValueType.String,
-      description: "",
-      fromKey: "customer_source_id",
-    },
-    details: {
-      type: coda.ValueType.String,
-      description: "Opportunity details",
-    },
-    lossReasonId: {
-      // TODO: Connect this to user's configured loss reasons, and show the string version
-      type: coda.ValueType.String,
-      description: "The reason for losing the opportunity",
-      fromKey: "loss_reason_id",
-    },
-    pipelineId: {
-      // TODO: Connect this to user's configured pipelines, and show the string version
-      type: coda.ValueType.String,
-      description: "ID of the opportunity's pipeline",
-      fromKey: "pipeline_id",
-    },
-    pipelineStageId: {
-      // TODO: Connect this to user's configured pipeline stages, and show the string version
-      type: coda.ValueType.String,
-      description: "Stage of the pipeline that the opportunity is in",
-      fromKey: "pipeline_stage_id",
-    },
-    primaryContactId: {
-      // TODO: Make this a reference to Person
-      type: coda.ValueType.String,
-      description: "Primary customer contact ID",
-      fromKey: "primary_contact_id",
-    },
-    status: {
-      type: coda.ValueType.String,
-      description: "Status of the opportunity",
-    },
-    tags: {
-      type: coda.ValueType.Array,
-      items: coda.makeSchema({
-        type: coda.ValueType.String,
-      }),
-      description: "Opportunity tags",
-    },
-    interactionCount: {
-      type: coda.ValueType.Number,
-      description: "Number of interactions related to this opportunity",
-      fromKey: "interaction_count",
-    },
-    monetaryValue: {
-      type: coda.ValueType.Number,
-      description: "Expected value of the opportunity",
-      fromKey: "monetary_value",
-    },
-    winProbability: {
-      type: coda.ValueType.Number,
-      description: "Probability of winning",
-      fromKey: "win_probability",
-    },
-    dateLastContacted: {
-      type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Date,
-      description: "Date of last contact",
-      fromKey: "date_last_contacted",
-    },
-    // leadsConvertedFrom: {
-    //   type: coda.ValueType.Array,
-    //   items: coda.makeSchema({
-    //     type: coda.ValueType.String
-    //   }),
-    //   description: "Leads the opportunity was converted from",
-    // },
-    dateLeadCreated: {
-      type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Date,
-      description: "Date the lead was created on",
-      fromKey: "date_lead_created",
-    },
-    dateCreated: {
-      type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Date,
-      description: "Date the opportunity was created on",
-      fromKey: "date_created",
-    },
-    dateModified: {
-      type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Date,
-      description: "Date the opportunity was last modified on",
-      fromKey: "date_modified",
-    },
-    // TODO: Implement custom fields
-  },
-});
-
 export const CompanySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "companyId",
   primary: "companyName",
   featured: ["companyName", "fullAddress", "emailDomain", "interactionCount"],
+  identity: { name: "Company" }, // TODO: Check if this is required or not
   properties: {
     companyId: {
       type: coda.ValueType.String,
       description: "Company ID on Copper",
+      required: true,
       fromKey: "id",
     },
     companyName: {
       type: coda.ValueType.String,
       description: "Company name",
+      required: true,
       fromKey: "name",
     },
     fullAddress: {
@@ -266,6 +134,144 @@ export const CompanySchema = coda.makeObjectSchema({
       description: "Date modified",
       fromKey: "date_modified",
     },
+  },
+});
+
+export const CompanyReferenceSchema =
+  coda.makeReferenceSchemaFromObjectSchema(CompanySchema);
+
+export const OpportunitySchema = coda.makeObjectSchema({
+  type: coda.ValueType.Object,
+  id: "opportunityId",
+  primary: "opportunityName",
+  featured: ["company", "status", "monetaryValue", "closeDate"],
+  identity: { name: "Opportunity" },
+  properties: {
+    opportunityId: {
+      type: coda.ValueType.String,
+      description: "Copper ID of the opportunity",
+      required: true,
+      fromKey: "id",
+    },
+    opportunityName: {
+      type: coda.ValueType.String,
+      description: "Name of the opportunity",
+      fromKey: "name",
+    },
+    assigneeId: {
+      // TODO: Connect this to company assignees
+      type: coda.ValueType.String,
+      fromKey: "assignee_id",
+    },
+    closeDate: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Date,
+      description: "Close date of the opportunity",
+      fromKey: "close_date",
+    },
+    company: CompanyReferenceSchema,
+    companyId: {
+      type: coda.ValueType.String,
+      description: "Id of the related company",
+      fromKey: "company_id",
+    },
+    companyName: {
+      type: coda.ValueType.String,
+      description: "Name of the related company",
+      fromKey: "company_name",
+    },
+    customerSourceId: {
+      // TODO: Figure out what this is haha
+      type: coda.ValueType.String,
+      description: "",
+      fromKey: "customer_source_id",
+    },
+    details: {
+      type: coda.ValueType.String,
+      description: "Opportunity details",
+    },
+    lossReasonId: {
+      // TODO: Connect this to user's configured loss reasons, and show the string version
+      type: coda.ValueType.String,
+      description: "The reason for losing the opportunity",
+      fromKey: "loss_reason_id",
+    },
+    pipelineId: {
+      // TODO: Connect this to user's configured pipelines, and show the string version
+      type: coda.ValueType.String,
+      description: "ID of the opportunity's pipeline",
+      fromKey: "pipeline_id",
+    },
+    pipelineStageId: {
+      // TODO: Connect this to user's configured pipeline stages, and show the string version
+      type: coda.ValueType.String,
+      description: "Stage of the pipeline that the opportunity is in",
+      fromKey: "pipeline_stage_id",
+    },
+    primaryContactId: {
+      // TODO: Make this a reference to Person
+      type: coda.ValueType.String,
+      description: "Primary customer contact ID",
+      fromKey: "primary_contact_id",
+    },
+    status: {
+      type: coda.ValueType.String,
+      description: "Status of the opportunity",
+    },
+    tags: {
+      type: coda.ValueType.Array,
+      items: coda.makeSchema({
+        type: coda.ValueType.String,
+      }),
+      description: "Opportunity tags",
+    },
+    interactionCount: {
+      type: coda.ValueType.Number,
+      description: "Number of interactions related to this opportunity",
+      fromKey: "interaction_count",
+    },
+    monetaryValue: {
+      type: coda.ValueType.Number,
+      description: "Expected value of the opportunity",
+      fromKey: "monetary_value",
+    },
+    winProbability: {
+      type: coda.ValueType.Number,
+      description: "Probability of winning",
+      fromKey: "win_probability",
+    },
+    dateLastContacted: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Date,
+      description: "Date of last contact",
+      fromKey: "date_last_contacted",
+    },
+    // leadsConvertedFrom: {
+    //   type: coda.ValueType.Array,
+    //   items: coda.makeSchema({
+    //     type: coda.ValueType.String
+    //   }),
+    //   description: "Leads the opportunity was converted from",
+    // },
+    dateLeadCreated: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Date,
+      description: "Date the lead was created on",
+      fromKey: "date_lead_created",
+    },
+    dateCreated: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Date,
+      description: "Date the opportunity was created on",
+      fromKey: "date_created",
+    },
+    dateModified: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Date,
+      description: "Date the opportunity was last modified on",
+      fromKey: "date_modified",
+    },
+    // TODO: Implement custom fields
   },
 });
 
