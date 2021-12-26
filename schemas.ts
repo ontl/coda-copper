@@ -3,7 +3,7 @@ export const CompanySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "companyId",
   primary: "companyName",
-  featured: ["companyName", "fullAddress", "emailDomain", "interactionCount"],
+  featured: ["fullAddress", "emailDomain", "interactionCount"],
   identity: { name: "Company" }, // TODO: Check if this is required or not
   properties: {
     companyId: {
