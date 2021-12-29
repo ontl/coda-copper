@@ -15,7 +15,7 @@ export const CompanySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "companyId",
   primary: "companyName",
-  featured: ["fullAddress", "emailDomain", "interactionCount"],
+  featured: ["fullAddress", "emailDomain", "interactionCount", "url"],
   identity: { name: "Company" }, // TODO: Check if this is required or not
   properties: {
     companyId: {
@@ -147,6 +147,11 @@ export const CompanySchema = coda.makeObjectSchema({
       description: "Date modified",
       fromKey: "date_modified",
     },
+    url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "View Comapny on Copper",
+    },
   },
 });
 
@@ -157,7 +162,7 @@ export const OpportunitySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "opportunityId",
   primary: "opportunityName",
-  featured: ["company", "status", "monetaryValue", "closeDate"],
+  featured: ["company", "status", "monetaryValue", "closeDate", "url"],
   identity: { name: "Opportunity" },
   properties: {
     opportunityId: {
@@ -285,6 +290,11 @@ export const OpportunitySchema = coda.makeObjectSchema({
       fromKey: "date_modified",
     },
     // TODO: Implement custom fields
+    url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "View Opportunity on Copper",
+    },
   },
 });
 

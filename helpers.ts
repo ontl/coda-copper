@@ -59,18 +59,18 @@ function concatenateAddress(address: types.CopperAddress) {
  * this is the id of the users's organization, not just the specific user's account.
  */
 async function getAccountId(context: coda.ExecutionContext) {
-  const response = await callApi(context, "accounts");
+  const response = await callApi(context, "account", "GET");
   return response.body.id;
 }
 
 /**
  * Generates human-ready URLs for Copper entities
- * @param copperAccountId, pulled once via getAccountId()
- * @param entityType, using Copper's URL naming (company = "organization", opportunity = "deal", person = "contact")
+ * @param copperAccountId pulled once via getAccountId()
+ * @param entityType using Copper's URL naming (company = "organization", opportunity = "deal", person = "contact")
  * @param entityId
  * @returns URL of the entity
  */
-async function getCopperUrl(
+function getCopperUrl(
   copperAccountId: string,
   entityType: "organization" | "deal" | "contact",
   entityId: string
@@ -111,6 +111,9 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     }
   }
 
+  // Get the Copper account ID for use when building Copper URLs later on
+  const copperAccountId = await getAccountId(context);
+
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
   let pageNumber: number =
@@ -133,13 +136,17 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
         companyId: opportunity.company_id,
         companyName: opportunity.company_name,
       };
-      opportunity.assignee = {
-        copperUserId: opportunity.assignee_id,
-        email: userEmails[opportunity.assignee_id],
-        name: userNames[opportunity.assignee_id],
-      };
     }
-    // console.log(JSON.stringify(opportunity.company));
+    // prepare reference to Coda Person object (Coda will try to match this
+    // to a Coda user based on email)
+    opportunity.assignee = {
+      copperUserId: opportunity.assignee_id,
+      email: userEmails[opportunity.assignee_id],
+      name: userNames[opportunity.assignee_id],
+    };
+    // generate URL for Copper entity
+    opportunity.url = getCopperUrl(copperAccountId, "deal", opportunity.id);
+
     opportunities.push(opportunity);
   }
 
@@ -165,6 +172,9 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
  * Syncs companies from Copper
  */
 export async function syncCompanies(context: coda.SyncExecutionContext) {
+  // Get the Copper account ID for use when building Copper URLs later on
+  const copperAccountId = await getAccountId(context);
+
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
   let pageNumber: number =
@@ -181,6 +191,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   // generate concatenated string representation of company address
   companies.forEach((company) => {
     company.fullAddress = concatenateAddress(company.address);
+    company.url = getCopperUrl(copperAccountId, "organization", company.id);
   });
 
   // If we got a full page of results, that means there are probably more results
