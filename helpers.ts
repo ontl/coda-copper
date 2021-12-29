@@ -20,7 +20,8 @@ async function callApi(
   context: coda.ExecutionContext,
   endpoint: string,
   method: "GET" | "POST" = "POST",
-  payload?: { [key: string]: any }
+  payload?: { [key: string]: any },
+  cacheTtlSecs: number = 60
 ) {
   // Set up custom auth tokens. This is a security measure of the Coda Pack SDK,
   // and relates to what we set up in pack.setUserAuthentication in pack.ts. Deails:
@@ -37,6 +38,7 @@ async function callApi(
       "X-PW-AccessToken": apiKeyToken,
     },
     body: JSON.stringify(payload),
+    cacheTtlSecs: cacheTtlSecs,
   });
   return response;
 }
@@ -59,7 +61,7 @@ function concatenateAddress(address: types.CopperAddress) {
  * this is the id of the users's organization, not just the specific user's account.
  */
 async function getAccountId(context: coda.ExecutionContext) {
-  const response = await callApi(context, "account", "GET");
+  const response = await callApi(context, "account", "GET", {}, 60 * 60 * 24);
   return response.body.id;
 }
 
@@ -88,28 +90,16 @@ function getCopperUrl(
 export async function syncOpportunities(context: coda.SyncExecutionContext) {
   // Get a list of Copper users, so we can map their email addresses to their
   // ids when they appear as assignees of an opportunity.
-  let userEmails = {};
-  let userNames = {};
-  // First, check if we already have this list from a previous continuation
-  if (
-    context.sync.continuation?.userEmails &&
-    context.sync.continuation?.userNames
-  ) {
-    userEmails = context.sync.continuation.userEmails;
-    userNames = context.sync.continuation.userNames;
-  } else {
-    // If not, get it from Copper
-    const response = await callApi(context, "users/search", "POST", {
+  let usersResponse = await callApi(
+    context,
+    "users/search",
+    "POST",
+    {
       page_size: 200, // set arbitrarily high to get all users (Copper API max = 200)
-    });
-    // Ideally we would store this as an array of user objects, but the Coda SDK's
-    // Continuation object doesn't support arrays. So instead we'll store it as a
-    // couple of objects: one for emails, and one for names.
-    for (const user of response.body) {
-      userEmails[user.id] = user.email;
-      userNames[user.id] = user.name;
-    }
-  }
+    },
+    60 * 5 // cache for 5 minutes
+  );
+  let users = usersResponse.body;
 
   // Get the Copper account ID for use when building Copper URLs later on
   const copperAccountId = await getAccountId(context);
@@ -137,12 +127,13 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
         companyName: opportunity.company_name,
       };
     }
-    // prepare reference to Coda Person object (Coda will try to match this
-    // to a Coda user based on email)
+    // Prepare reference to Coda Person object (Coda will try to match this
+    // to a Coda user based on email). First, find the matching user.
+    let assignee = users.filter((user) => user.id == opportunity.assignee_id);
     opportunity.assignee = {
       copperUserId: opportunity.assignee_id,
-      email: userEmails[opportunity.assignee_id],
-      name: userNames[opportunity.assignee_id],
+      email: assignee.email,
+      name: assignee.name,
     };
     // generate URL for Copper entity
     opportunity.url = getCopperUrl(copperAccountId, "deal", opportunity.id);
@@ -152,13 +143,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
-  let nextContinuation = {
-    pageNumber: undefined,
-    userEmails: {},
-    userNames: {},
-  };
-  nextContinuation.userEmails = userEmails;
-  nextContinuation.userNames = userNames;
+  let nextContinuation = undefined;
   if ((opportunities.length = PAGE_SIZE))
     nextContinuation.pageNumber = pageNumber + 1;
 
@@ -181,11 +166,17 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
     (context.sync.continuation?.pageNumber as number) || 1;
 
   // Grab a page of results
-  let response = await callApi(context, "companies/search", "POST", {
-    page_size: PAGE_SIZE,
-    page_number: pageNumber,
-    sort_by: "name",
-  });
+  let response = await callApi(
+    context,
+    "companies/search",
+    "POST",
+    {
+      page_size: PAGE_SIZE,
+      page_number: pageNumber,
+      sort_by: "name",
+    },
+    60
+  );
   let companies = response.body;
 
   // generate concatenated string representation of company address
