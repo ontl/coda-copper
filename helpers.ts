@@ -45,6 +45,7 @@ async function callApi(
 
 /**
  * Contatenates the components of a Copper physical address into a single string
+ * @param address object with street, city, state, country, postal_code like what Copper returns
  */
 function concatenateAddress(address: types.CopperAddress) {
   let concatenatedAddress: string = "";
@@ -57,17 +58,23 @@ function concatenateAddress(address: types.CopperAddress) {
 }
 
 /**
- * Gets the Copper account ID for use in constructing user-facing URLs. Note that
- * this is the id of the users's organization, not just the specific user's account.
+ * Gets users in the Copper organization, for mapping to assignees/owners of records
+ * @returns array of Copper users (objects with id, name, email)
  */
-async function getAccountId(context: coda.ExecutionContext) {
-  const response = await callApi(context, "account", "GET", {}, 60 * 60 * 24);
-  return response.body.id;
+async function getCopperUsers(context: coda.ExecutionContext) {
+  let response = await callApi(
+    context,
+    "users/search",
+    "POST",
+    { page_size: 200 }, // set arbitrarily high to get all users (Copper API max = 200)
+    60 * 5 // cache for 5 minutes
+  );
+  return response.body;
 }
 
 /**
  * Generates human-ready URLs for Copper entities
- * @param copperAccountId pulled once via getAccountId()
+ * @param copperAccountId pulled once and then provided each time (TODO: consider refactoring to fetch (cached) with each execution)
  * @param entityType using Copper's URL naming (company = "organization", opportunity = "deal", person = "contact")
  * @param entityId
  * @returns URL of the entity
@@ -80,6 +87,25 @@ function getCopperUrl(
   return `https://app.copper.com/companies/${copperAccountId}/app#/${entityType}/${entityId}`;
 }
 
+/**
+ * Gets basic, long-lived account configuration info such as pipelines, customer sources,
+ * loss reasons, etc.
+ * @returns usually an array of objects, sometimes just an object (e.g. account)
+ */
+async function callApiBasicCached(
+  context: coda.ExecutionContext,
+  endpoint: "pipelines" | "customer_sources" | "loss_reasons" | "account"
+) {
+  const response = await callApi(
+    context,
+    endpoint,
+    "GET",
+    { page_size: PAGE_SIZE },
+    60 * 60 // cache for 1 hour
+  );
+  return response.body;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                            Sync Table Functions                            */
 /* -------------------------------------------------------------------------- */
@@ -90,26 +116,22 @@ function getCopperUrl(
 export async function syncOpportunities(context: coda.SyncExecutionContext) {
   // Get a list of Copper users, so we can map their email addresses to their
   // ids when they appear as assignees of an opportunity.
-  let usersResponse = await callApi(
-    context,
-    "users/search",
-    "POST",
-    {
-      page_size: 200, // set arbitrarily high to get all users (Copper API max = 200)
-    },
-    60 * 5 // cache for 5 minutes
-  );
-  let users = usersResponse.body;
-
+  let users = await getCopperUsers(context);
+  console.log("users", users);
   // Get the Copper account ID for use when building Copper URLs later on
-  const copperAccountId = await getAccountId(context);
+  // Note this is the id of the overall Copper organization, not just this user
+  const copperAccount = await callApiBasicCached(context, "account");
+  // Get additional Copper configuration info
+  const pipelines = await callApiBasicCached(context, "pipelines");
+  const customerSources = await callApiBasicCached(context, "customer_sources");
+  const lossReasons = await callApiBasicCached(context, "loss_reasons");
 
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
   let pageNumber: number =
     (context.sync.continuation?.pageNumber as number) || 1;
 
-  // Grab a page of results
+  // Fetch a page of results
   let response = await callApi(context, "opportunities/search", "POST", {
     page_size: PAGE_SIZE,
     page_number: pageNumber,
@@ -129,23 +151,39 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     }
     // Prepare reference to Coda Person object (Coda will try to match this
     // to a Coda user based on email). First, find the matching user.
-    let assignee = users.filter((user) => user.id == opportunity.assignee_id);
+    let assignee = users.find((user) => user.id == opportunity.assignee_id);
     opportunity.assignee = {
       copperUserId: opportunity.assignee_id,
       email: assignee.email,
       name: assignee.name,
     };
     // generate URL for Copper entity
-    opportunity.url = getCopperUrl(copperAccountId, "deal", opportunity.id);
+    opportunity.url = getCopperUrl(copperAccount.id, "deal", opportunity.id);
+    // Match to pipelines and pipeline stages
+    let pipeline = pipelines.find(
+      (pipeline) => pipeline.id == opportunity.pipeline_id
+    );
+    opportunity.pipeline = pipeline?.name;
+    opportunity.pipelineStage = pipeline.stages.find(
+      (stage) => stage.id == opportunity.pipeline_stage_id
+    )?.name;
+    // Match to customer sources
+    opportunity.customerSource = customerSources.find(
+      (source) => source.id == opportunity.customer_source_id
+    )?.name;
+    // Match to loss reasons
+    opportunity.lossReason = lossReasons.find(
+      (reason) => reason.id == opportunity.loss_reason_id
+    )?.name;
 
     opportunities.push(opportunity);
   }
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
-  let nextContinuation = undefined;
+  let nextContinuation = {};
   if ((opportunities.length = PAGE_SIZE))
-    nextContinuation.pageNumber = pageNumber + 1;
+    nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
     result: opportunities,
@@ -158,7 +196,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
  */
 export async function syncCompanies(context: coda.SyncExecutionContext) {
   // Get the Copper account ID for use when building Copper URLs later on
-  const copperAccountId = await getAccountId(context);
+  const copperAccount = await callApiBasicCached(context, "account");
 
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
@@ -182,16 +220,14 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   // generate concatenated string representation of company address
   companies.forEach((company) => {
     company.fullAddress = concatenateAddress(company.address);
-    company.url = getCopperUrl(copperAccountId, "organization", company.id);
+    company.url = getCopperUrl(copperAccount.id, "organization", company.id);
   });
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = undefined;
   if ((companies.length = PAGE_SIZE))
-    nextContinuation = {
-      pageNumber: pageNumber + 1,
-    };
+    nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
     result: companies,

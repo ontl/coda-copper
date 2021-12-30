@@ -198,33 +198,25 @@ export const OpportunitySchema = coda.makeObjectSchema({
       description: "Name of the related company",
       fromKey: "company_name",
     },
-    customerSourceId: {
-      // TODO: Figure out what this is haha
+    customerSource: {
       type: coda.ValueType.String,
-      description: "",
-      fromKey: "customer_source_id",
+      description: "Customer source",
     },
     details: {
       type: coda.ValueType.String,
       description: "Opportunity details",
     },
-    lossReasonId: {
-      // TODO: Connect this to user's configured loss reasons, and show the string version
+    lossReason: {
       type: coda.ValueType.String,
       description: "The reason for losing the opportunity",
-      fromKey: "loss_reason_id",
     },
-    pipelineId: {
-      // TODO: Connect this to user's configured pipelines, and show the string version
+    pipeline: {
       type: coda.ValueType.String,
-      description: "ID of the opportunity's pipeline",
-      fromKey: "pipeline_id",
+      description: "The pipeline the opportunity belongs to",
     },
-    pipelineStageId: {
-      // TODO: Connect this to user's configured pipeline stages, and show the string version
+    pipelineStage: {
       type: coda.ValueType.String,
       description: "Stage of the pipeline that the opportunity is in",
-      fromKey: "pipeline_stage_id",
     },
     primaryContactId: {
       // TODO: Make this a reference to Person
