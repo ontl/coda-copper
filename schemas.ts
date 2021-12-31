@@ -370,7 +370,7 @@ export const OpportunitySchema = coda.makeObjectSchema({
     },
     assignee: CopperUserSchema,
     closeDate: {
-      type: coda.ValueType.String,
+      type: coda.ValueType.String, // yep, for some reason this is a string while others are unix epoch
       codaType: coda.ValueHintType.Date,
       description: "Close date of the opportunity",
       fromKey: "close_date",
@@ -439,7 +439,7 @@ export const OpportunitySchema = coda.makeObjectSchema({
       fromKey: "win_probability",
     },
     dateLastContacted: {
-      type: coda.ValueType.String,
+      type: coda.ValueType.Number,
       codaType: coda.ValueHintType.Date,
       description: "Date of last contact",
       fromKey: "date_last_contacted",
@@ -452,19 +452,19 @@ export const OpportunitySchema = coda.makeObjectSchema({
     //   description: "Leads the opportunity was converted from",
     // },
     dateLeadCreated: {
-      type: coda.ValueType.String,
+      type: coda.ValueType.Number,
       codaType: coda.ValueHintType.Date,
       description: "Date the lead was created on",
       fromKey: "date_lead_created",
     },
     dateCreated: {
-      type: coda.ValueType.String,
+      type: coda.ValueType.Number,
       codaType: coda.ValueHintType.Date,
       description: "Date the opportunity was created on",
       fromKey: "date_created",
     },
     dateModified: {
-      type: coda.ValueType.String,
+      type: coda.ValueType.Number,
       codaType: coda.ValueHintType.Date,
       description: "Date the opportunity was last modified on",
       fromKey: "date_modified",
