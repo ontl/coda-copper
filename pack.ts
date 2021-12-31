@@ -58,3 +58,20 @@ pack.addSyncTable({
     },
   },
 });
+
+/**
+ * Syncs people from Copper
+ */
+pack.addSyncTable({
+  name: "People",
+  schema: schemas.PersonSchema,
+  identityName: "Person",
+  formula: {
+    name: "SyncPeople",
+    description: "Sync people from Copper",
+    parameters: [],
+    execute: async function ([], context) {
+      return helpers.syncPeople(context);
+    },
+  },
+});

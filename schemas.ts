@@ -1,6 +1,10 @@
 import * as coda from "@codahq/packs-sdk";
 
-const CopperUser = coda.makeObjectSchema({
+/* -------------------------------------------------------------------------- */
+/*                            Common object schemas                           */
+/* -------------------------------------------------------------------------- */
+
+const CopperUserSchema = coda.makeObjectSchema({
   codaType: coda.ValueHintType.Person,
   properties: {
     email: { type: coda.ValueType.String, required: true },
@@ -11,12 +15,82 @@ const CopperUser = coda.makeObjectSchema({
   id: "email",
 });
 
+const PhoneNumberSchema = coda.makeObjectSchema({
+  type: coda.ValueType.Object,
+  primary: "number",
+  id: "number",
+  properties: {
+    number: {
+      type: coda.ValueType.String,
+      description: "Phone number",
+    },
+    category: {
+      type: coda.ValueType.String,
+      description: "Phone number category",
+    },
+  },
+});
+
+const EmailAddressSchema = coda.makeObjectSchema({
+  type: coda.ValueType.Object,
+  primary: "email",
+  id: "email",
+  properties: {
+    email: {
+      type: coda.ValueType.String,
+      description: "Email address",
+    },
+    category: {
+      type: coda.ValueType.String,
+      description: "Email category",
+    },
+  },
+});
+
+const SocialSchema = coda.makeObjectSchema({
+  type: coda.ValueType.Object,
+  primary: "category",
+  id: "url",
+  properties: {
+    url: {
+      type: coda.ValueType.String,
+      description: "Social media URL",
+      codaType: coda.ValueHintType.Url,
+    },
+    category: {
+      type: coda.ValueType.String,
+      description: "Social media category",
+    },
+  },
+});
+
+const WebsiteSchema = coda.makeObjectSchema({
+  type: coda.ValueType.Object,
+  primary: "url",
+  id: "url",
+  properties: {
+    url: {
+      type: coda.ValueType.String,
+      description: "Website URL",
+      codaType: coda.ValueHintType.Url,
+    },
+    category: {
+      type: coda.ValueType.String,
+      description: "Website category",
+    },
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/*                             Sync table schemas                             */
+/* -------------------------------------------------------------------------- */
+
 export const CompanySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "companyId",
   primary: "companyName",
   featured: ["fullAddress", "emailDomain", "interactionCount", "url"],
-  identity: { name: "Company" }, // TODO: Check if this is required or not
+  identity: { name: "Company" },
   properties: {
     companyId: {
       type: coda.ValueType.String,
@@ -65,7 +139,7 @@ export const CompanySchema = coda.makeObjectSchema({
       description: "Assignee ID on Copper",
       fromKey: "assignee_id",
     },
-    asignee: CopperUser,
+    asignee: CopperUserSchema,
     contactTypeId: {
       type: coda.ValueType.String,
       description: "Contact type ID on Copper",
@@ -84,27 +158,12 @@ export const CompanySchema = coda.makeObjectSchema({
       type: coda.ValueType.Array,
       description: "Phone numbers",
       fromKey: "phone_numbers",
-      items: coda.makeObjectSchema({
-        type: coda.ValueType.Object,
-        properties: {
-          number: {
-            type: coda.ValueType.String,
-            description: "Phone number",
-          },
-          category: {
-            type: coda.ValueType.String,
-            description: "Phone number category",
-          },
-        },
-      }),
+      items: PhoneNumberSchema,
     },
     socials: {
       type: coda.ValueType.Array,
       description: "Social media links",
-      // TODO: FIgure out what these come in as (just strings, or objects?)
-      items: coda.makeSchema({
-        type: coda.ValueType.String,
-      }),
+      items: SocialSchema,
     },
     tags: {
       type: coda.ValueType.Array,
@@ -116,23 +175,11 @@ export const CompanySchema = coda.makeObjectSchema({
     websites: {
       type: coda.ValueType.Array,
       description: "Websites",
-      items: coda.makeObjectSchema({
-        type: coda.ValueType.Object,
-        properties: {
-          url: {
-            type: coda.ValueType.String,
-            description: "Website URL",
-          },
-          category: {
-            type: coda.ValueType.String,
-            description: "Website category",
-          },
-        },
-      }),
+      items: WebsiteSchema,
     },
     interactionCount: {
       type: coda.ValueType.Number,
-      description: "Number of interactions",
+      description: "Number of interactions with this company",
       fromKey: "interaction_count",
     },
     dateCreated: {
@@ -158,6 +205,147 @@ export const CompanySchema = coda.makeObjectSchema({
 export const CompanyReferenceSchema =
   coda.makeReferenceSchemaFromObjectSchema(CompanySchema);
 
+export const PersonSchema = coda.makeObjectSchema({
+  type: coda.ValueType.Object,
+  id: "personId",
+  primary: "fullName",
+  featured: ["company", "assignee", "url"],
+  identity: { name: "Person" },
+  properties: {
+    personId: {
+      type: coda.ValueType.String,
+      description: "Person ID on Copper",
+      required: true,
+      fromKey: "id",
+    },
+    fullName: {
+      type: coda.ValueType.String,
+      description: "Person name",
+      required: true,
+      fromKey: "name",
+    },
+    prefix: {
+      type: coda.ValueType.String,
+      description: "Prefix",
+    },
+    firstName: {
+      type: coda.ValueType.String,
+      description: "First name",
+      fromKey: "first_name",
+    },
+    middleName: {
+      type: coda.ValueType.String,
+      description: "Middle name",
+      fromKey: "middle_name",
+    },
+    lastName: {
+      type: coda.ValueType.String,
+      description: "Last name",
+      fromKey: "last_name",
+    },
+    suffix: {
+      type: coda.ValueType.String,
+      description: "Name suffix",
+    },
+    title: {
+      type: coda.ValueType.String,
+      description: "Title",
+    },
+    fullAddress: {
+      // synthetic address property (combining all address fields)
+      type: coda.ValueType.String,
+      description: "Full address",
+    },
+    street: {
+      type: coda.ValueType.String,
+      description: "Address: street",
+      fromKey: "address.street",
+    },
+    city: {
+      type: coda.ValueType.String,
+      description: "Address: city",
+      fromKey: "address.city",
+    },
+    state: {
+      type: coda.ValueType.String,
+      description: "Address: state",
+      fromKey: "address.state",
+    },
+    postalCode: {
+      type: coda.ValueType.String,
+      description: "Address: postal code",
+      fromKey: "address.postal_code",
+    },
+    country: {
+      type: coda.ValueType.String,
+      description: "Address: country",
+      fromKey: "address.country",
+    },
+    company: CompanyReferenceSchema,
+    assignee: CopperUserSchema,
+    contactType: {
+      type: coda.ValueType.String,
+      description: "Type of contact",
+    },
+    details: {
+      type: coda.ValueType.String,
+      description: "Details",
+    },
+    emails: {
+      type: coda.ValueType.Array,
+      description: "Email addresses",
+      items: EmailAddressSchema,
+    },
+    phoneNumbers: {
+      type: coda.ValueType.Array,
+      description: "Phone numbers",
+      items: PhoneNumberSchema,
+    },
+    socials: {
+      type: coda.ValueType.Array,
+      description: "Social media links",
+      items: SocialSchema,
+    },
+    tags: {
+      type: coda.ValueType.Array,
+      description: "Tags",
+      items: coda.makeSchema({
+        type: coda.ValueType.String,
+      }),
+    },
+    websites: {
+      type: coda.ValueType.Array,
+      description: "Websites",
+      items: WebsiteSchema,
+    },
+    interactionCount: {
+      type: coda.ValueType.Number,
+      description: "Number of interactions with this person",
+      fromKey: "interaction_count",
+    },
+    dateCreated: {
+      type: coda.ValueType.Number,
+      codaType: coda.ValueHintType.Date,
+      description: "Date created",
+      fromKey: "date_created",
+    },
+    dateModified: {
+      type: coda.ValueType.Number,
+      codaType: coda.ValueHintType.Date,
+      description: "Date modified",
+      fromKey: "date_modified",
+    },
+    url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "View Person on Copper",
+    },
+  },
+});
+
+export const PersonReferenceSchema =
+  coda.makeReferenceSchemaFromObjectSchema(PersonSchema);
+
 export const OpportunitySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "opportunityId",
@@ -180,7 +368,7 @@ export const OpportunitySchema = coda.makeObjectSchema({
       type: coda.ValueType.String,
       fromKey: "assignee_id",
     },
-    assignee: CopperUser,
+    assignee: CopperUserSchema,
     closeDate: {
       type: coda.ValueType.String,
       codaType: coda.ValueHintType.Date,
@@ -219,11 +407,11 @@ export const OpportunitySchema = coda.makeObjectSchema({
       description: "Stage of the pipeline that the opportunity is in",
     },
     primaryContactId: {
-      // TODO: Make this a reference to Person
       type: coda.ValueType.String,
       description: "Primary customer contact ID",
       fromKey: "primary_contact_id",
     },
+    primaryContact: PersonReferenceSchema,
     status: {
       type: coda.ValueType.String,
       description: "Status of the opportunity",
@@ -372,3 +560,37 @@ export const OpportunitySchema = coda.makeObjectSchema({
 // "date_created": 1496707930,
 // "date_modified": 1496707932
 // }
+
+// sample API response for people:
+//         "id": 27140338,
+//         "name": "My Contact",
+//         "prefix": null,
+//         "first_name": "My",
+//         "middle_name": null,
+//         "last_name": "Contact",
+//         "suffix": null,
+//         "address": null,
+//         "assignee_id": null,
+//         "company_id": null,
+//         "company_name": null,
+//         "contact_type_id": 451492,
+//         "details": null,
+//         "emails": [],
+//         "phone_numbers": [],
+//         "socials": [],
+//         "tags": [],
+//         "title": null,
+//         "websites": [],
+//         "custom_fields": [
+//             {
+//                 "custom_field_definition_id": 100764,
+//                 "value": "Text fields are 255 chars or less!"
+//             },
+//             {
+//                 "custom_field_definition_id": 103481,
+//                 "value": "Text area fields can have long text content"
+//             }
+//         ],
+//         "date_created": 1490044880,
+//         "date_modified": 1490044880,
+//         "interaction_count": 0

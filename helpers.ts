@@ -94,7 +94,12 @@ function getCopperUrl(
  */
 async function callApiBasicCached(
   context: coda.ExecutionContext,
-  endpoint: "pipelines" | "customer_sources" | "loss_reasons" | "account"
+  endpoint:
+    | "pipelines"
+    | "customer_sources"
+    | "loss_reasons"
+    | "account"
+    | "contact_types"
 ) {
   const response = await callApi(
     context,
@@ -117,7 +122,6 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
   // Get a list of Copper users, so we can map their email addresses to their
   // ids when they appear as assignees of an opportunity.
   let users = await getCopperUsers(context);
-  console.log("users", users);
   // Get the Copper account ID for use when building Copper URLs later on
   // Note this is the id of the overall Copper organization, not just this user
   const copperAccount = await callApiBasicCached(context, "account");
@@ -154,8 +158,13 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     let assignee = users.find((user) => user.id == opportunity.assignee_id);
     opportunity.assignee = {
       copperUserId: opportunity.assignee_id,
-      email: assignee.email,
-      name: assignee.name,
+      email: assignee?.email,
+      name: assignee?.name,
+    };
+    // Match primary contact (Person record)
+    opportunity.primaryContact = {
+      personId: opportunity.primary_contact_id,
+      // TODO: pull person's name from API? that's a lot of calls...
     };
     // generate URL for Copper entity
     opportunity.url = getCopperUrl(copperAccount.id, "deal", opportunity.id);
@@ -204,20 +213,14 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
     (context.sync.continuation?.pageNumber as number) || 1;
 
   // Grab a page of results
-  let response = await callApi(
-    context,
-    "companies/search",
-    "POST",
-    {
-      page_size: PAGE_SIZE,
-      page_number: pageNumber,
-      sort_by: "name",
-    },
-    60
-  );
+  let response = await callApi(context, "companies/search", "POST", {
+    page_size: PAGE_SIZE,
+    page_number: pageNumber,
+    sort_by: "name",
+  });
   let companies = response.body;
 
-  // generate concatenated string representation of company address
+  // generate address and Copper record URL
   companies.forEach((company) => {
     company.fullAddress = concatenateAddress(company.address);
     company.url = getCopperUrl(copperAccount.id, "organization", company.id);
@@ -231,6 +234,72 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
 
   return {
     result: companies,
+    continuation: nextContinuation,
+  };
+}
+
+/**
+ * Syncs Person records (contacts) from Copper
+ */
+export async function syncPeople(context: coda.SyncExecutionContext) {
+  // Get a list of Copper users, so we can map their email addresses to their
+  // ids when they appear as assignees of a person record.
+  let users = await getCopperUsers(context);
+  // Get the Copper account ID for use when building Copper URLs later on
+  // Note this is the id of the overall Copper organization, not just this user
+  const copperAccount = await callApiBasicCached(context, "account");
+  // Get additional Copper configuration info
+  const contactTypes = await callApiBasicCached(context, "contact_types");
+
+  // If there is a previous continuation, grab its page number. Otherwise,
+  // start at page 1.
+  let pageNumber: number =
+    (context.sync.continuation?.pageNumber as number) || 1;
+
+  // Grab a page of results
+  let response = await callApi(context, "people/search", "POST", {
+    page_size: PAGE_SIZE,
+    page_number: pageNumber,
+    sort_by: "name",
+  });
+
+  // Process the results
+  let people = [];
+  for (let person of response.body) {
+    person.fullAddress = concatenateAddress(person.address);
+    person.url = getCopperUrl(copperAccount.id, "contact", person.id);
+    // prepare reference to companies table
+    if (person.company_id) {
+      person.company = {
+        companyId: person.company_id,
+        companyName: person.company_name,
+      };
+    }
+    // Prepare reference to Coda Person object (Coda will try to match this
+    // to a Coda user based on email). First, find the matching user.
+    // TODO: refactor this out into a function
+    let assignee = users.find((user) => user.id == person.assignee_id);
+    person.assignee = {
+      copperUserId: person.assignee_id,
+      email: assignee?.email,
+      name: assignee?.name,
+    };
+    // Match contact type and get string representation
+    person.contactType = contactTypes.find(
+      (contactType) => contactType.id == person.contact_type_id
+    )?.name;
+
+    people.push(person);
+  }
+
+  // If we got a full page of results, that means there are probably more results
+  // on the next page. Set up a continuation to grab the next page if so.
+  let nextContinuation = undefined;
+  if ((people.length = PAGE_SIZE))
+    nextContinuation = { pageNumber: pageNumber + 1 };
+
+  return {
+    result: people,
     continuation: nextContinuation,
   };
 }
