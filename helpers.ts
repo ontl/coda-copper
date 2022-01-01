@@ -44,6 +44,30 @@ async function callApi(
 }
 
 /**
+ * Gets basic, long-lived account configuration info such as pipelines, customer sources,
+ * loss reasons, etc.
+ * @returns usually an array of objects, sometimes just an object (e.g. account)
+ */
+async function callApiBasicCached(
+  context: coda.ExecutionContext,
+  endpoint:
+    | "pipelines"
+    | "customer_sources"
+    | "loss_reasons"
+    | "account"
+    | "contact_types"
+) {
+  const response = await callApi(
+    context,
+    endpoint,
+    "GET",
+    { page_size: PAGE_SIZE },
+    60 * 60 // cache for 1 hour
+  );
+  return response.body;
+}
+
+/**
  * Contatenates the components of a Copper physical address into a single string
  * @param address object with street, city, state, country, postal_code like what Copper returns
  */
@@ -69,6 +93,7 @@ async function getCopperUsers(context: coda.ExecutionContext) {
     { page_size: 200 }, // set arbitrarily high to get all users (Copper API max = 200)
     60 * 5 // cache for 5 minutes
   );
+  console.log(JSON.stringify(response.body));
   return response.body;
 }
 
@@ -87,28 +112,129 @@ function getCopperUrl(
   return `https://app.copper.com/companies/${copperAccountId}/app#/${entityType}/${entityId}`;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                           API Response Formatters                          */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Gets basic, long-lived account configuration info such as pipelines, customer sources,
- * loss reasons, etc.
- * @returns usually an array of objects, sometimes just an object (e.g. account)
+ * Massages a Copper person response, ready for ingesting into Person schema
+ * @param person person object direct from Copper API
+ * @param copperAccountId for building Copper URLs
+ * @param users array of Copper users for mapping to assignees/owners of records
+ * @param contactTypes array of Copper contact types
+ * @returns version of the person object with additional fields
  */
-async function callApiBasicCached(
-  context: coda.ExecutionContext,
-  endpoint:
-    | "pipelines"
-    | "customer_sources"
-    | "loss_reasons"
-    | "account"
-    | "contact_types"
+// TODO: make a type for the API responses
+function enrichPersonResponse(
+  person: any,
+  copperAccountId: string,
+  users: [any],
+  contactTypes: [any]
 ) {
-  const response = await callApi(
-    context,
-    endpoint,
-    "GET",
-    { page_size: PAGE_SIZE },
-    60 * 60 // cache for 1 hour
+  person.fullAddress = concatenateAddress(person.address);
+  person.url = getCopperUrl(copperAccountId, "contact", person.id);
+  // prepare reference to companies table
+  if (person.company_id) {
+    person.company = {
+      companyId: person.company_id,
+      companyName: person.company_name,
+    };
+  }
+  if (users) {
+    // Prepare reference to Coda Person object (Coda will try to match this
+    // to a Coda user based on email). First, find the matching user.
+    let assignee = users.find((user) => user.id == person.assignee_id);
+    person.assignee = {
+      copperUserId: person.assignee_id,
+      email: assignee?.email,
+      name: assignee?.name,
+    };
+  }
+  if (contactTypes) {
+    // Match contact type and get string representation
+    person.contactType = contactTypes.find(
+      (contactType) => contactType.id == person.contact_type_id
+    )?.name;
+  }
+  return person;
+}
+
+function enrichCompanyResponse(
+  company: any,
+  copperAccountId: string,
+  users: [any]
+) {
+  company.url = getCopperUrl(copperAccountId, "organization", company.id);
+  company.fullAddress = concatenateAddress(company.address);
+  if (users) {
+    // Prepare reference to Coda Person object (Coda will try to match this
+    // to a Coda user based on email). First, find the matching user.
+    let assignee = users.find((user) => user.id == company.assignee_id);
+    company.assignee = {
+      copperUserId: company.assignee_id,
+      email: assignee?.email,
+      name: assignee?.name,
+    };
+  }
+  return company;
+}
+
+function enrichOpportunityResponse(
+  opportunity: any,
+  copperAccountId: string,
+  users: [any],
+  pipelines: [any],
+  customerSources: [any],
+  lossReasons: [any],
+  // references to other tables only work in sync tables; don't add them for column formats
+  withReferences: boolean = false
+) {
+  opportunity.url = getCopperUrl(copperAccountId, "deal", opportunity.id);
+  // Prepare reference to Coda Person object (Coda will try to match this
+  // to a Coda user based on email). First, find the matching user.
+  let assignee = users.find((user) => user.id == opportunity.assignee_id);
+  opportunity.assignee = {
+    copperUserId: opportunity.assignee_id,
+    email: assignee?.email,
+    name: assignee?.name,
+  };
+  // Match to pipelines and pipeline stages
+  let pipeline = pipelines.find(
+    (pipeline) => pipeline.id == opportunity.pipeline_id
   );
-  return response.body;
+  opportunity.pipeline = pipeline?.name;
+  opportunity.pipelineStage = pipeline.stages.find(
+    (stage) => stage.id == opportunity.pipeline_stage_id
+  )?.name;
+  // Match to customer sources
+  opportunity.customerSource = customerSources.find(
+    (source) => source.id == opportunity.customer_source_id
+  )?.name;
+  // Match to loss reasons
+  opportunity.lossReason = lossReasons.find(
+    (reason) => reason.id == opportunity.loss_reason_id
+  )?.name;
+
+  // If we're enriching this record for a sync table, we want to prepare references
+  // to other tables like the related Comapny and Person (contact). This referencing
+  // isn't supported for column formats, so that's why we don't always want to do it.
+  if (withReferences) {
+    if (opportunity.company_id) {
+      opportunity.company = {
+        companyId: opportunity.company_id,
+        companyName: opportunity.company_name,
+      };
+    }
+    if (opportunity.primary_contact_id) {
+      opportunity.primaryContact = {
+        personId: opportunity.primary_contact_id,
+        // we could pull the name from the API but that would be vv expensive. Instead,
+        // let's set a default that will be overridden by a successful reference to
+        fullName: "Not found",
+      };
+    }
+  }
+  return opportunity;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -148,49 +274,17 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
   ]);
 
   // Process the results
-  let opportunities = [];
-  for (let opportunity of response.body) {
-    // prepare reference to companies table
-    if (opportunity.company_id) {
-      opportunity.company = {
-        companyId: opportunity.company_id,
-        companyName: opportunity.company_name,
-      };
-    }
-    // Prepare reference to Coda Person object (Coda will try to match this
-    // to a Coda user based on email). First, find the matching user.
-    let assignee = users.find((user) => user.id == opportunity.assignee_id);
-    opportunity.assignee = {
-      copperUserId: opportunity.assignee_id,
-      email: assignee?.email,
-      name: assignee?.name,
-    };
-    // Match primary contact (Person record)
-    opportunity.primaryContact = {
-      personId: opportunity.primary_contact_id,
-      // TODO: pull person's name from API? that's a lot of calls...
-    };
-    // generate URL for Copper entity
-    opportunity.url = getCopperUrl(copperAccount.id, "deal", opportunity.id);
-    // Match to pipelines and pipeline stages
-    let pipeline = pipelines.find(
-      (pipeline) => pipeline.id == opportunity.pipeline_id
-    );
-    opportunity.pipeline = pipeline?.name;
-    opportunity.pipelineStage = pipeline.stages.find(
-      (stage) => stage.id == opportunity.pipeline_stage_id
-    )?.name;
-    // Match to customer sources
-    opportunity.customerSource = customerSources.find(
-      (source) => source.id == opportunity.customer_source_id
-    )?.name;
-    // Match to loss reasons
-    opportunity.lossReason = lossReasons.find(
-      (reason) => reason.id == opportunity.loss_reason_id
-    )?.name;
-
-    opportunities.push(opportunity);
-  }
+  let opportunities = response.body.map((opportunity) =>
+    enrichOpportunityResponse(
+      opportunity,
+      copperAccount.id,
+      users,
+      pipelines,
+      customerSources,
+      lossReasons,
+      true // include references to Person and Company sync tables
+    )
+  );
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
@@ -213,23 +307,22 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   let pageNumber: number =
     (context.sync.continuation?.pageNumber as number) || 1;
 
-  // Get a page of results, as well as the Copper account info we'll need for building URLs
-  const [response, copperAccount] = await Promise.all([
+  // Get a page of results, the Copper account info we'll need for building URLs,
+  // and the list of users who might be "assignees"
+  const [response, copperAccount, users] = await Promise.all([
     callApi(context, "companies/search", "POST", {
       page_size: PAGE_SIZE,
       page_number: pageNumber,
       sort_by: "name",
     }),
     callApiBasicCached(context, "account"),
+    getCopperUsers(context),
   ]);
 
-  let companies = response.body;
-
-  // generate address and Copper record URL
-  companies.forEach((company) => {
-    company.fullAddress = concatenateAddress(company.address);
-    company.url = getCopperUrl(copperAccount.id, "organization", company.id);
-  });
+  // Process the results by passing each company to the enrichment function
+  let companies = response.body.map((company) =>
+    enrichCompanyResponse(company, copperAccount.id, users)
+  );
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
@@ -265,34 +358,10 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
     callApiBasicCached(context, "contact_types"),
   ]);
 
-  // Process the results
-  let people = [];
-  for (let person of response.body) {
-    person.fullAddress = concatenateAddress(person.address);
-    person.url = getCopperUrl(copperAccount.id, "contact", person.id);
-    // prepare reference to companies table
-    if (person.company_id) {
-      person.company = {
-        companyId: person.company_id,
-        companyName: person.company_name,
-      };
-    }
-    // Prepare reference to Coda Person object (Coda will try to match this
-    // to a Coda user based on email). First, find the matching user.
-    // TODO: refactor this out into a function
-    let assignee = users.find((user) => user.id == person.assignee_id);
-    person.assignee = {
-      copperUserId: person.assignee_id,
-      email: assignee?.email,
-      name: assignee?.name,
-    };
-    // Match contact type and get string representation
-    person.contactType = contactTypes.find(
-      (contactType) => contactType.id == person.contact_type_id
-    )?.name;
-
-    people.push(person);
-  }
+  // Process the results by sending each person to the enrichment function
+  let people = response.body.map((person) =>
+    enrichPersonResponse(person, copperAccount.id, users, contactTypes)
+  );
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.

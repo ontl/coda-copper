@@ -139,7 +139,7 @@ export const CompanySchema = coda.makeObjectSchema({
       description: "Assignee ID on Copper",
       fromKey: "assignee_id",
     },
-    asignee: CopperUserSchema,
+    assignee: CopperUserSchema,
     contactTypeId: {
       type: coda.ValueType.String,
       description: "Contact type ID on Copper",
@@ -451,12 +451,12 @@ export const OpportunitySchema = coda.makeObjectSchema({
     //   }),
     //   description: "Leads the opportunity was converted from",
     // },
-    dateLeadCreated: {
-      type: coda.ValueType.Number,
-      codaType: coda.ValueHintType.Date,
-      description: "Date the lead was created on",
-      fromKey: "date_lead_created",
-    },
+    // dateLeadCreated: {
+    //   type: coda.ValueType.Number,
+    //   codaType: coda.ValueHintType.Date,
+    //   description: "Date the lead was created on",
+    //   fromKey: "date_lead_created",
+    // },
     dateCreated: {
       type: coda.ValueType.Number,
       codaType: coda.ValueHintType.Date,
