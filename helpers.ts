@@ -119,29 +119,33 @@ async function callApiBasicCached(
  * Syncs opportunities from Copper
  */
 export async function syncOpportunities(context: coda.SyncExecutionContext) {
-  // Get a list of Copper users, so we can map their email addresses to their
-  // ids when they appear as assignees of an opportunity.
-  let users = await getCopperUsers(context);
-  // Get the Copper account ID for use when building Copper URLs later on
-  // Note this is the id of the overall Copper organization, not just this user
-  const copperAccount = await callApiBasicCached(context, "account");
-  // Get additional Copper configuration info
-  const pipelines = await callApiBasicCached(context, "pipelines");
-  const customerSources = await callApiBasicCached(context, "customer_sources");
-  const lossReasons = await callApiBasicCached(context, "loss_reasons");
-
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
   let pageNumber: number =
     (context.sync.continuation?.pageNumber as number) || 1;
 
-  // Fetch a page of results
-  let response = await callApi(context, "opportunities/search", "POST", {
-    page_size: PAGE_SIZE,
-    page_number: pageNumber,
-    sort_by: "date_created",
-    sort_direction: "desc",
-  });
+  // Get a page of results, as well as all the background info we'll need to enrich
+  // the records we get back from the Copper API
+  const [
+    response, // page of results from Copper API
+    users, // Copper users who might be "assignees"
+    copperAccount, // for building Copper URLs
+    pipelines,
+    customerSources,
+    lossReasons,
+  ] = await Promise.all([
+    callApi(context, "opportunities/search", "POST", {
+      page_size: PAGE_SIZE,
+      page_number: pageNumber,
+      sort_by: "date_created",
+      sort_direction: "desc",
+    }),
+    getCopperUsers(context),
+    callApiBasicCached(context, "account"),
+    callApiBasicCached(context, "pipelines"),
+    callApiBasicCached(context, "customer_sources"),
+    callApiBasicCached(context, "loss_reasons"),
+  ]);
 
   // Process the results
   let opportunities = [];
@@ -204,20 +208,21 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
  * Syncs companies from Copper
  */
 export async function syncCompanies(context: coda.SyncExecutionContext) {
-  // Get the Copper account ID for use when building Copper URLs later on
-  const copperAccount = await callApiBasicCached(context, "account");
-
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
   let pageNumber: number =
     (context.sync.continuation?.pageNumber as number) || 1;
 
-  // Grab a page of results
-  let response = await callApi(context, "companies/search", "POST", {
-    page_size: PAGE_SIZE,
-    page_number: pageNumber,
-    sort_by: "name",
-  });
+  // Get a page of results, as well as the Copper account info we'll need for building URLs
+  const [response, copperAccount] = await Promise.all([
+    callApi(context, "companies/search", "POST", {
+      page_size: PAGE_SIZE,
+      page_number: pageNumber,
+      sort_by: "name",
+    }),
+    callApiBasicCached(context, "account"),
+  ]);
+
   let companies = response.body;
 
   // generate address and Copper record URL
@@ -242,26 +247,23 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
  * Syncs Person records (contacts) from Copper
  */
 export async function syncPeople(context: coda.SyncExecutionContext) {
-  // Get a list of Copper users, so we can map their email addresses to their
-  // ids when they appear as assignees of a person record.
-  let users = await getCopperUsers(context);
-  // Get the Copper account ID for use when building Copper URLs later on
-  // Note this is the id of the overall Copper organization, not just this user
-  const copperAccount = await callApiBasicCached(context, "account");
-  // Get additional Copper configuration info
-  const contactTypes = await callApiBasicCached(context, "contact_types");
-
   // If there is a previous continuation, grab its page number. Otherwise,
   // start at page 1.
   let pageNumber: number =
     (context.sync.continuation?.pageNumber as number) || 1;
 
-  // Grab a page of results
-  let response = await callApi(context, "people/search", "POST", {
-    page_size: PAGE_SIZE,
-    page_number: pageNumber,
-    sort_by: "name",
-  });
+  // Get a page of results, as well as all the background info we'll need to enrich
+  // the records we get back from the Copper API
+  const [response, users, copperAccount, contactTypes] = await Promise.all([
+    callApi(context, "people/search", "POST", {
+      page_size: PAGE_SIZE,
+      page_number: pageNumber,
+      sort_by: "name",
+    }),
+    getCopperUsers(context),
+    callApiBasicCached(context, "account"),
+    callApiBasicCached(context, "contact_types"),
+  ]);
 
   // Process the results
   let people = [];
