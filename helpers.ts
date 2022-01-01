@@ -71,7 +71,7 @@ async function callApiBasicCached(
  * Contatenates the components of a Copper physical address into a single string
  * @param address object with street, city, state, country, postal_code like what Copper returns
  */
-function concatenateAddress(address: types.CopperAddress) {
+function concatenateAddress(address: types.AddressApiProperty) {
   let concatenatedAddress: string = "";
   if (address?.street) concatenatedAddress += address.street + ", ";
   if (address?.city) concatenatedAddress += address.city + ", ";
