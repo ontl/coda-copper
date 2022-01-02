@@ -96,6 +96,27 @@ export interface PersonApiResponse {
   custom_fields?: CustomFieldApiProperty[];
 }
 
+export interface CopperUserApiResponse {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface BasicApiResponse {
+  id: string;
+  name: string;
+}
+
+export interface PipelineApiResponse {
+  id: string;
+  name: string;
+  stages: {
+    id: string;
+    name: string;
+    win_probability: number; // 0-100
+  }[];
+}
+
 /* -------------------------------------------------------------------------- */
 /*                            Formula Return Types                            */
 /* -------------------------------------------------------------------------- */

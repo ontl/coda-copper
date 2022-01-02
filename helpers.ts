@@ -93,8 +93,8 @@ async function getCopperUsers(context: coda.ExecutionContext) {
     { page_size: 200 }, // set arbitrarily high to get all users (Copper API max = 200)
     60 * 5 // cache for 5 minutes
   );
-  console.log(JSON.stringify(response.body));
-  return response.body;
+  let copperUsers: types.CopperUserApiResponse[] = response.body;
+  return copperUsers;
 }
 
 /**
@@ -124,12 +124,11 @@ function getCopperUrl(
  * @param contactTypes array of Copper contact types
  * @returns version of the person object with additional fields
  */
-// TODO: make a type for the API responses
 function enrichPersonResponse(
   person: any,
   copperAccountId: string,
-  users: [any],
-  contactTypes: [any]
+  users: types.CopperUserApiResponse[],
+  contactTypes: types.BasicApiResponse[]
 ) {
   person.fullAddress = concatenateAddress(person.address);
   person.url = getCopperUrl(copperAccountId, "contact", person.id);
@@ -162,7 +161,7 @@ function enrichPersonResponse(
 function enrichCompanyResponse(
   company: any,
   copperAccountId: string,
-  users: [any]
+  users: types.CopperUserApiResponse[]
 ) {
   company.url = getCopperUrl(copperAccountId, "organization", company.id);
   company.fullAddress = concatenateAddress(company.address);
@@ -182,10 +181,10 @@ function enrichCompanyResponse(
 function enrichOpportunityResponse(
   opportunity: any,
   copperAccountId: string,
-  users: [any],
-  pipelines: [any],
-  customerSources: [any],
-  lossReasons: [any],
+  users: types.CopperUserApiResponse[],
+  pipelines: types.PipelineApiResponse[],
+  customerSources: types.BasicApiResponse[],
+  lossReasons: types.BasicApiResponse[],
   // references to other tables only work in sync tables; don't add them for column formats
   withReferences: boolean = false
 ) {
@@ -274,16 +273,17 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
   ]);
 
   // Process the results
-  let opportunities = response.body.map((opportunity) =>
-    enrichOpportunityResponse(
-      opportunity,
-      copperAccount.id,
-      users,
-      pipelines,
-      customerSources,
-      lossReasons,
-      true // include references to Person and Company sync tables
-    )
+  let opportunities: types.OpportunityApiResponse[] = response.body.map(
+    (opportunity: types.OpportunityApiResponse) =>
+      enrichOpportunityResponse(
+        opportunity,
+        copperAccount.id,
+        users,
+        pipelines,
+        customerSources,
+        lossReasons,
+        true // include references to Person and Company sync tables
+      )
   );
 
   // If we got a full page of results, that means there are probably more results
@@ -320,8 +320,9 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   ]);
 
   // Process the results by passing each company to the enrichment function
-  let companies = response.body.map((company) =>
-    enrichCompanyResponse(company, copperAccount.id, users)
+  let companies: types.CompanyApiResponse[] = response.body.map(
+    (company: types.CompanyApiResponse) =>
+      enrichCompanyResponse(company, copperAccount.id, users)
   );
 
   // If we got a full page of results, that means there are probably more results
@@ -359,8 +360,9 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
   ]);
 
   // Process the results by sending each person to the enrichment function
-  let people = response.body.map((person) =>
-    enrichPersonResponse(person, copperAccount.id, users, contactTypes)
+  let people: types.PersonApiResponse[] = response.body.map(
+    (person: types.PersonApiResponse) =>
+      enrichPersonResponse(person, copperAccount.id, users, contactTypes)
   );
 
   // If we got a full page of results, that means there are probably more results
