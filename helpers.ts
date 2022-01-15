@@ -1,8 +1,30 @@
-import type * as coda from "@codahq/packs-sdk";
+import * as coda from "@codahq/packs-sdk";
 import type * as types from "./types";
+
+/* -------------------------------------------------------------------------- */
+/*                                  Constants                                 */
+/* -------------------------------------------------------------------------- */
 
 const BASE_URL = "https://api.copper.com/developer_api/v1/";
 const PAGE_SIZE = 50; // max accepted by the API is 200, but that can crash Pack execution
+const RECORD_TYPES = {
+  // Copper referes to things differently in its URLs; this is the mapping (url style on the left)
+  contact: "person",
+  deal: "opportunity",
+  organization: "company",
+};
+export const copperRecordUrlRegex = new RegExp(
+  "/app.copper.com/companies/[0-9]+/app#/.*(contact|deal|organization)/([0-9]{5,})"
+);
+export const copperOpportunityUrlRegex = new RegExp(
+  "^https://app.copper.com/companies/[0-9]+/app#/.*deal/([0-9]{5,})"
+);
+export const copperPersonUrlRegex = new RegExp(
+  "^https://app.copper.com/companies/[0-9]+/app#/.*contact/([0-9]{5,})"
+);
+export const copperCompanyUrlRegex = new RegExp(
+  "^https://app.copper.com/companies/[0-9]+/app#/.*organization/([0-9]{5,})"
+);
 
 /* -------------------------------------------------------------------------- */
 /*                              Helper Functions                              */
@@ -112,22 +134,48 @@ function getCopperUrl(
   return `https://app.copper.com/companies/${copperAccountId}/app#/${entityType}/${entityId}`;
 }
 
+/**
+ * Extracts a Copper record ID from a Copper URL (or just returns the ID if ID is supplied)
+ * @param idOrUrl user-supplied record ID or Copper URL for a record
+ * @returns { id, type }
+ */
 function getIdFromUrlOrId(idOrUrl: string) {
   const copperIdRegex = new RegExp("^[0-9]{5,}$"); // just a number, with 5 or more digits
-  const copperRecordUrlRegex = new RegExp(
-    "/app.copper.com/companies/[0-9]+/app#/(contact|deal|organization)/([0-9]{5,})"
-  );
   // If it already looks like an ID, just return it
-  if (copperIdRegex.test(idOrUrl)) return idOrUrl;
+  if (copperIdRegex.test(idOrUrl)) return { id: idOrUrl, type: null };
   // If it looks like a URL, extract the ID from the URL (the id is going to be caught in
   // the 2nd capture group, accessible via [2])
   if (copperRecordUrlRegex.test(idOrUrl)) {
     let matches = copperRecordUrlRegex.exec(idOrUrl);
-    // we're interested in the third match group (not the main URL or record type, but the id)
-    return matches[2];
+    if (matches) {
+      // The type is the second capture group, accessible via [1]. convert it from the
+      // nomenclature used in Copper's URLs to the nomenclature used everywhere else
+      let recordType = RECORD_TYPES[matches[1]];
+      return {
+        id: matches[2],
+        type: recordType,
+      };
+    }
   }
-  // TODO: Make this a coda.userVisibleError ("coda.UserVisibleError is not a constructor" it was complaining)
-  console.log("Invalid Copper ID or URL");
+  // It didn't look like a valid ID or a URL
+  throw new coda.UserVisibleError("Invalid Copper ID or URL");
+}
+
+function checkRecordIdType(recordType: string, expectedType: string) {
+  if (recordType && recordType !== expectedType) {
+    throw new coda.UserVisibleError(
+      `Expected ${addIndefiniteArticle(
+        expectedType
+      )}, but got ${addIndefiniteArticle(recordType)}`
+    );
+  }
+}
+
+function addIndefiniteArticle(word: string) {
+  // Add "a" or "an" to the beginning of a word because UX
+  let vowels = "aeiou";
+  let article = vowels.includes(word[0]) ? "an" : "a";
+  return article + " " + word;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -405,18 +453,21 @@ export async function getOpportunity(
 ) {
   // Determine whether the user supplied an ID or a full URL, and extract the ID
   const opportunityId = getIdFromUrlOrId(urlOrId as string);
-  console.log("extracted id:", opportunityId);
-  // Get the ID, as well as all the background info we'll need to enrich
+  // If we know the record type, and it's the wrong type, throw an error.
+  // We'll only know the type if the user supplied a URL though (not when they just
+  // supplied an ID)
+  checkRecordIdType(opportunityId.type, "opportunity");
+  // Get the opportunity, as well as all the background info we'll need to enrich
   // the records we get back from the Copper API
   const [
-    response, // page of results from Copper API
+    response, // opportunity record from Copper API
     users, // Copper users who might be "assignees"
     copperAccount, // for building Copper URLs
     pipelines,
     customerSources,
     lossReasons,
   ] = await Promise.all([
-    callApi(context, "opportunities/" + opportunityId, "GET"),
+    callApi(context, "opportunities/" + opportunityId.id, "GET"),
     getCopperUsers(context),
     callApiBasicCached(context, "account"),
     callApiBasicCached(context, "pipelines"),
@@ -435,4 +486,63 @@ export async function getOpportunity(
   );
 
   return opportunity;
+}
+
+export async function getPerson(
+  context: coda.ExecutionContext,
+  urlOrId: string
+) {
+  // Determine whether the user supplied an ID or a full URL, and extract the ID
+  const opportunityId = getIdFromUrlOrId(urlOrId as string);
+  checkRecordIdType(opportunityId.type, "person");
+  // Get the person, as well as all the background info we'll need to enrich
+  // the records we get back from the Copper API
+  const [
+    response, // opportunity record from Copper API
+    users, // Copper users who might be "assignees"
+    copperAccount, // for building Copper URLs
+    contactTypes,
+  ] = await Promise.all([
+    callApi(context, "people/" + opportunityId.id, "GET"),
+    getCopperUsers(context),
+    callApiBasicCached(context, "account"),
+    callApiBasicCached(context, "contact_types"),
+  ]);
+
+  let person = await enrichPersonResponse(
+    response.body,
+    copperAccount.id,
+    users,
+    contactTypes
+  );
+
+  return person;
+}
+
+export async function getCompany(
+  context: coda.ExecutionContext,
+  urlOrId: string
+) {
+  // Determine whether the user supplied an ID or a full URL, and extract the ID
+  const opportunityId = getIdFromUrlOrId(urlOrId as string);
+  checkRecordIdType(opportunityId.type, "company");
+  // Get the company, as well as all the background info we'll need to enrich
+  // the records we get back from the Copper API
+  const [
+    response, // opportunity record from Copper API
+    users, // Copper users who might be "assignees"
+    copperAccount, // for building Copper URLs
+  ] = await Promise.all([
+    callApi(context, "companies/" + opportunityId.id, "GET"),
+    getCopperUsers(context),
+    callApiBasicCached(context, "account"),
+  ]);
+
+  let company = await enrichCompanyResponse(
+    response.body,
+    copperAccount.id,
+    users
+  );
+
+  return company;
 }
