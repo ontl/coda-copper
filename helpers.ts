@@ -112,6 +112,24 @@ function getCopperUrl(
   return `https://app.copper.com/companies/${copperAccountId}/app#/${entityType}/${entityId}`;
 }
 
+function getIdFromUrlOrId(idOrUrl: string) {
+  const copperIdRegex = new RegExp("^[0-9]{5,}$"); // just a number, with 5 or more digits
+  const copperRecordUrlRegex = new RegExp(
+    "/app.copper.com/companies/[0-9]+/app#/(contact|deal|organization)/([0-9]{5,})"
+  );
+  // If it already looks like an ID, just return it
+  if (copperIdRegex.test(idOrUrl)) return idOrUrl;
+  // If it looks like a URL, extract the ID from the URL (the id is going to be caught in
+  // the 2nd capture group, accessible via [2])
+  if (copperRecordUrlRegex.test(idOrUrl)) {
+    let matches = copperRecordUrlRegex.exec(idOrUrl);
+    // we're interested in the third match group (not the main URL or record type, but the id)
+    return matches[2];
+  }
+  // TODO: Make this a coda.userVisibleError ("coda.UserVisibleError is not a constructor" it was complaining)
+  console.log("Invalid Copper ID or URL");
+}
+
 /* -------------------------------------------------------------------------- */
 /*                           API Response Formatters                          */
 /* -------------------------------------------------------------------------- */
@@ -375,4 +393,46 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
     result: people,
     continuation: nextContinuation,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               Getter Formulas                              */
+/* -------------------------------------------------------------------------- */
+
+export async function getOpportunity(
+  context: coda.ExecutionContext,
+  urlOrId: string
+) {
+  // Determine whether the user supplied an ID or a full URL, and extract the ID
+  const opportunityId = getIdFromUrlOrId(urlOrId as string);
+  console.log("extracted id:", opportunityId);
+  // Get the ID, as well as all the background info we'll need to enrich
+  // the records we get back from the Copper API
+  const [
+    response, // page of results from Copper API
+    users, // Copper users who might be "assignees"
+    copperAccount, // for building Copper URLs
+    pipelines,
+    customerSources,
+    lossReasons,
+  ] = await Promise.all([
+    callApi(context, "opportunities/" + opportunityId, "GET"),
+    getCopperUsers(context),
+    callApiBasicCached(context, "account"),
+    callApiBasicCached(context, "pipelines"),
+    callApiBasicCached(context, "customer_sources"),
+    callApiBasicCached(context, "loss_reasons"),
+  ]);
+
+  let opportunity = await enrichOpportunityResponse(
+    response.body,
+    copperAccount.id,
+    users,
+    pipelines,
+    customerSources,
+    lossReasons,
+    false // don't include references to Person and Company sync tables
+  );
+
+  return opportunity;
 }

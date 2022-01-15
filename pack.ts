@@ -75,3 +75,27 @@ pack.addSyncTable({
     },
   },
 });
+
+/* -------------------------------------------------------------------------- */
+/*                                  Formulas                                  */
+/* -------------------------------------------------------------------------- */
+
+// Read-only formulas
+
+pack.addFormula({
+  name: "Opportunity",
+  description: "Gets a Copper Opportunity by URL or ID",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the opportunity",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+
+  execute: async function ([urlOrId], context) {
+    return helpers.getOpportunity(context, urlOrId);
+  },
+});
