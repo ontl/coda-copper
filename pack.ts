@@ -35,6 +35,7 @@ pack.addSyncTable({
   formula: {
     name: "SyncOpportunities",
     description: "Sync opportunities from Copper",
+    cacheTtlSecs: 0, // don't cache results
     parameters: [],
     execute: async function ([], context) {
       return helpers.syncOpportunities(context);
@@ -52,6 +53,7 @@ pack.addSyncTable({
   formula: {
     name: "SyncCompanies",
     description: "Sync companies from Copper",
+    cacheTtlSecs: 0, // don't cache results
     parameters: [],
     execute: async function ([], context) {
       return helpers.syncCompanies(context);
@@ -69,6 +71,7 @@ pack.addSyncTable({
   formula: {
     name: "SyncPeople",
     description: "Sync people from Copper",
+    cacheTtlSecs: 0, // don't cache results
     parameters: [],
     execute: async function ([], context) {
       return helpers.syncPeople(context);
