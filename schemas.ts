@@ -430,6 +430,7 @@ export const OpportunitySchema = coda.makeObjectSchema({
     },
     monetaryValue: {
       type: coda.ValueType.Number,
+      codaType: coda.ValueHintType.Currency,
       description: "Expected value of the opportunity",
       fromKey: "monetary_value",
     },
