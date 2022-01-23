@@ -25,9 +25,6 @@ pack.setUserAuthentication({
 /*                                 Sync Tables                                */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Syncs opportunities from Copper
- */
 pack.addSyncTable({
   name: "Opportunities",
   schema: schemas.OpportunitySchema,
@@ -43,9 +40,6 @@ pack.addSyncTable({
   },
 });
 
-/**
- * Syncs companies from Copper
- */
 pack.addSyncTable({
   name: "Companies",
   schema: schemas.CompanySchema,
@@ -61,9 +55,6 @@ pack.addSyncTable({
   },
 });
 
-/**
- * Syncs people from Copper
- */
 pack.addSyncTable({
   name: "People",
   schema: schemas.PersonSchema,
@@ -184,12 +175,16 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "newStatus",
       description: "The new status to set on the opportunity",
+      autocomplete: helpers.STATUS_OPTIONS,
     }),
     coda.makeParameter({
       type: coda.ParameterType.String,
       name: "lossReason",
       description: "If changing to Lost, the reason for the loss",
       optional: true,
+      autocomplete: async function (context) {
+        return helpers.getLossReasons(context);
+      },
     }),
   ],
   resultType: coda.ValueType.Object,
@@ -218,6 +213,9 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "assigneeEmail",
       description: "The email address of the person you want to assign it to",
+      autocomplete: async function (context) {
+        return helpers.getUsers(context);
+      },
     }),
   ],
   resultType: coda.ValueType.Object,
