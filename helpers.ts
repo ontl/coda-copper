@@ -1,45 +1,6 @@
 import * as coda from "@codahq/packs-sdk";
+import * as constants from "./constants";
 import type * as types from "./types";
-
-/* -------------------------------------------------------------------------- */
-/*                                  Constants                                 */
-/* -------------------------------------------------------------------------- */
-
-const BASE_URL = "https://api.copper.com/developer_api/v1/";
-const PAGE_SIZE = 50; // max accepted by the API is 200, but that can crash Pack execution
-export const STATUS_OPTIONS = ["Open", "Won", "Lost", "Abandoned"];
-const RECORD_TYPES = [
-  // Copper refers to these record types differently in different contexts. For example,
-  // a customer is called a "person" in the UI and in API urls (the plural "people" is
-  // used in API urls too). In web URLs though, the legacy term "contact" is used.
-  {
-    primary: "person",
-    plural: "people",
-    webUrl: "contact",
-  },
-  {
-    primary: "company",
-    plural: "companies",
-    webUrl: "organization",
-  },
-  {
-    primary: "opportunity",
-    plural: "opportunities",
-    webUrl: "deal",
-  },
-];
-export const copperRecordUrlRegex = new RegExp(
-  "/app.copper.com/companies/[0-9]+/app#/.*(contact|deal|organization)/([0-9]{5,})"
-);
-export const copperOpportunityUrlRegex = new RegExp(
-  "^https://app.copper.com/companies/[0-9]+/app#/.*deal/([0-9]{5,})"
-);
-export const copperPersonUrlRegex = new RegExp(
-  "^https://app.copper.com/companies/[0-9]+/app#/.*contact/([0-9]{5,})"
-);
-export const copperCompanyUrlRegex = new RegExp(
-  "^https://app.copper.com/companies/[0-9]+/app#/.*organization/([0-9]{5,})"
-);
 
 /* -------------------------------------------------------------------------- */
 /*                              Helper Functions                              */
@@ -53,7 +14,7 @@ export const copperCompanyUrlRegex = new RegExp(
  * sort_by: the field to sort by
  * sort_order: asc (default) or desc
  */
-async function callApi(
+export async function callApi(
   context: coda.ExecutionContext,
   endpoint: string,
   method: "GET" | "POST" | "PUT" = "POST",
@@ -67,7 +28,7 @@ async function callApi(
   const emailToken = "{{email-" + context.invocationToken + "}}";
   const response = await context.fetcher.fetch({
     method: method,
-    url: BASE_URL + endpoint,
+    url: constants.BASE_URL + endpoint,
     headers: {
       "X-PW-Application": "developer_api",
       "Content-Type": "application/json",
@@ -85,7 +46,7 @@ async function callApi(
  * loss reasons, etc.
  * @returns usually an array of objects, sometimes just an object (e.g. account)
  */
-async function callApiBasicCached(
+export async function callApiBasicCached(
   context: coda.ExecutionContext,
   endpoint:
     | "pipelines"
@@ -98,7 +59,7 @@ async function callApiBasicCached(
     context,
     endpoint,
     "GET",
-    { page_size: PAGE_SIZE },
+    { page_size: constants.PAGE_SIZE },
     60 * 60 // cache for 1 hour
   );
   return response.body;
@@ -108,7 +69,7 @@ async function callApiBasicCached(
  * Gets users in the Copper organization, for mapping to assignees/owners of records
  * @returns array of Copper users (objects with id, name, email)
  */
-async function getCopperUsers(context: coda.ExecutionContext) {
+export async function getCopperUsers(context: coda.ExecutionContext) {
   let response = await callApi(
     context,
     "users/search",
@@ -154,18 +115,18 @@ function getCopperUrl(
  * @param idOrUrl user-supplied record ID or Copper URL for a record
  * @returns { id, type }
  */
-function getIdFromUrlOrId(idOrUrl: string) {
+export function getIdFromUrlOrId(idOrUrl: string) {
   const copperIdRegex = new RegExp("^[0-9]{5,}$"); // just a number, with 5 or more digits
   // If it already looks like an ID, just return it
   if (copperIdRegex.test(idOrUrl)) return { id: idOrUrl, type: null };
   // If it looks like a URL, extract the ID from the URL (the id is going to be caught in
   // the 2nd capture group, accessible via [2])
-  if (copperRecordUrlRegex.test(idOrUrl)) {
-    let matches = copperRecordUrlRegex.exec(idOrUrl);
+  if (constants.copperRecordUrlRegex.test(idOrUrl)) {
+    let matches = constants.copperRecordUrlRegex.exec(idOrUrl);
     if (matches) {
       // The type is the second capture group, accessible via [1]. convert it from the
       // nomenclature used in Copper's URLs to the nomenclature used everywhere else (the 'primary')
-      let recordType = RECORD_TYPES.find(
+      let recordType = constants.RECORD_TYPES.find(
         (type) => type.webUrl === matches[1]
       ).primary;
       return {
@@ -178,7 +139,7 @@ function getIdFromUrlOrId(idOrUrl: string) {
   throw new coda.UserVisibleError("Invalid Copper ID or URL");
 }
 
-function checkRecordIdType(recordType: string, expectedType: string) {
+export function checkRecordIdType(recordType: string, expectedType: string) {
   if (recordType && recordType !== expectedType) {
     throw new coda.UserVisibleError(
       `Expected ${addIndefiniteArticle(
@@ -195,11 +156,11 @@ function addIndefiniteArticle(word: string) {
   return article + " " + word;
 }
 
-function titleCase(string: string) {
+export function titleCase(string: string) {
   return string[0].toUpperCase() + string.slice(1).toLowerCase();
 }
 
-function humanReadableList(list: string[], conjunction: string = "or") {
+export function humanReadableList(list: string[], conjunction: string = "or") {
   if (list.length === 1) return list[0];
   if (list.length === 2) return list.join(" " + conjunction + " ");
   return (
@@ -215,7 +176,7 @@ function humanReadableList(list: string[], conjunction: string = "or") {
 // the API (for the main record and also its supporting data), and use the
 // supporting data to enrich the main record.
 
-function enrichPersonResponse(
+export function enrichPersonResponse(
   person: any,
   copperAccountId: string,
   users: types.CopperUserApiResponse[],
@@ -249,7 +210,7 @@ function enrichPersonResponse(
   return person;
 }
 
-function enrichCompanyResponse(
+export function enrichCompanyResponse(
   company: any,
   copperAccountId: string,
   users: types.CopperUserApiResponse[]
@@ -269,7 +230,7 @@ function enrichCompanyResponse(
   return company;
 }
 
-function enrichOpportunityResponse(
+export function enrichOpportunityResponse(
   opportunity: any,
   copperAccountId: string,
   users: types.CopperUserApiResponse[],
@@ -335,7 +296,7 @@ function enrichOpportunityResponse(
 // usually help with this problem, but since some of the endpoints we need to hit
 // are POST (e.g. getCopperUsers()), we can't rely on the built-in caching.
 
-async function enrichPersonResponseWithFetches(
+export async function enrichPersonResponseWithFetches(
   context: coda.ExecutionContext,
   person: types.PersonApiResponse
 ) {
@@ -360,7 +321,7 @@ async function enrichPersonResponseWithFetches(
   return enrichedPerson;
 }
 
-async function enrichCompanyResponseWithFetches(
+export async function enrichCompanyResponseWithFetches(
   context: coda.ExecutionContext,
   company: types.CompanyApiResponse
 ) {
@@ -379,7 +340,7 @@ async function enrichCompanyResponseWithFetches(
   return enrichedCompany;
 }
 
-async function enrichOpportunityResponseWithFetches(
+export async function enrichOpportunityResponseWithFetches(
   context: coda.ExecutionContext,
   opportunity: types.OpportunityApiResponse
 ) {
@@ -429,7 +390,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     lossReasons,
   ] = await Promise.all([
     callApi(context, "opportunities/search", "POST", {
-      page_size: PAGE_SIZE,
+      page_size: constants.PAGE_SIZE,
       page_number: pageNumber,
       sort_by: "date_created",
       sort_direction: "desc",
@@ -458,7 +419,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = {};
-  if ((opportunities.length = PAGE_SIZE))
+  if ((opportunities.length = constants.PAGE_SIZE))
     nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
@@ -480,7 +441,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   // and the list of users who might be "assignees"
   const [response, copperAccount, users] = await Promise.all([
     callApi(context, "companies/search", "POST", {
-      page_size: PAGE_SIZE,
+      page_size: constants.PAGE_SIZE,
       page_number: pageNumber,
       sort_by: "name",
     }),
@@ -497,7 +458,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = undefined;
-  if ((companies.length = PAGE_SIZE))
+  if ((companies.length = constants.PAGE_SIZE))
     nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
@@ -519,7 +480,7 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
   // the records we get back from the Copper API
   const [response, users, copperAccount, contactTypes] = await Promise.all([
     callApi(context, "people/search", "POST", {
-      page_size: PAGE_SIZE,
+      page_size: constants.PAGE_SIZE,
       page_number: pageNumber,
       sort_by: "name",
     }),
@@ -537,248 +498,11 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = undefined;
-  if ((people.length = PAGE_SIZE))
+  if ((people.length = constants.PAGE_SIZE))
     nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
     result: people,
     continuation: nextContinuation,
   };
-}
-
-/* -------------------------------------------------------------------------- */
-/*                               Getter Formulas                              */
-/* -------------------------------------------------------------------------- */
-
-export async function getOpportunity(
-  context: coda.ExecutionContext,
-  urlOrId: string
-) {
-  // Determine whether the user supplied an ID or a full URL, and extract the ID
-  const opportunityId = getIdFromUrlOrId(urlOrId as string);
-  // If we know the record type, and it's the wrong type, throw an error.
-  // We'll only know the type if the user supplied a URL though (not when they just
-  // supplied an ID)
-  checkRecordIdType(opportunityId.type, "opportunity");
-  // Get the opportunity, as well as all the background info we'll need to enrich
-  // the records we get back from the Copper API
-  const [
-    response, // opportunity record from Copper API
-    users, // Copper users who might be "assignees"
-    copperAccount, // for building Copper URLs
-    pipelines,
-    customerSources,
-    lossReasons,
-  ] = await Promise.all([
-    callApi(context, "opportunities/" + opportunityId.id, "GET"),
-    getCopperUsers(context),
-    callApiBasicCached(context, "account"),
-    callApiBasicCached(context, "pipelines"),
-    callApiBasicCached(context, "customer_sources"),
-    callApiBasicCached(context, "loss_reasons"),
-  ]);
-
-  let opportunity = await enrichOpportunityResponse(
-    response.body,
-    copperAccount.id,
-    users,
-    pipelines,
-    customerSources,
-    lossReasons,
-    false // don't include references to Person and Company sync tables
-  );
-
-  return opportunity;
-}
-
-export async function getPerson(
-  context: coda.ExecutionContext,
-  urlOrId: string
-) {
-  // Determine whether the user supplied an ID or a full URL, and extract the ID
-  const opportunityId = getIdFromUrlOrId(urlOrId as string);
-  checkRecordIdType(opportunityId.type, "person");
-  // Get the person, as well as all the background info we'll need to enrich
-  // the records we get back from the Copper API
-  const [
-    response, // opportunity record from Copper API
-    users, // Copper users who might be "assignees"
-    copperAccount, // for building Copper URLs
-    contactTypes,
-  ] = await Promise.all([
-    callApi(context, "people/" + opportunityId.id, "GET"),
-    getCopperUsers(context),
-    callApiBasicCached(context, "account"),
-    callApiBasicCached(context, "contact_types"),
-  ]);
-
-  let person = await enrichPersonResponse(
-    response.body,
-    copperAccount.id,
-    users,
-    contactTypes
-  );
-
-  return person;
-}
-
-export async function getCompany(
-  context: coda.ExecutionContext,
-  urlOrId: string
-) {
-  // Determine whether the user supplied an ID or a full URL, and extract the ID
-  const opportunityId = getIdFromUrlOrId(urlOrId as string);
-  checkRecordIdType(opportunityId.type, "company");
-  // Get the company, as well as all the background info we'll need to enrich
-  // the records we get back from the Copper API
-  const [
-    response, // opportunity record from Copper API
-    users, // Copper users who might be "assignees"
-    copperAccount, // for building Copper URLs
-  ] = await Promise.all([
-    callApi(context, "companies/" + opportunityId.id, "GET"),
-    getCopperUsers(context),
-    callApiBasicCached(context, "account"),
-  ]);
-
-  let company = await enrichCompanyResponse(
-    response.body,
-    copperAccount.id,
-    users
-  );
-
-  return company;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                               Action Formulas                              */
-/* -------------------------------------------------------------------------- */
-
-export async function updateOpportunityStatus(
-  context: coda.ExecutionContext,
-  urlOrId: string,
-  newStatus: string, // the loss reason in plain text (not the loss reason ID)
-  lossReason?: string // if changing the status to lost, accept a loss reason
-) {
-  // Determine whether the user supplied an ID or a full URL, and extract the ID
-  const opportunityId = getIdFromUrlOrId(urlOrId);
-  // Make sure it's the correct type of record
-  checkRecordIdType(opportunityId.type, "opportunity");
-  // Make sure the status is valid
-  newStatus = titleCase(newStatus);
-  if (!STATUS_OPTIONS.includes(newStatus)) {
-    throw new coda.UserVisibleError(
-      "New status must be " + humanReadableList(STATUS_OPTIONS)
-    );
-  }
-
-  // Prepare the payload, including loss reason if appropriate
-  let payload: any = {
-    status: newStatus,
-  };
-  if (lossReason && newStatus === "Lost") {
-    let lossReasons = await callApiBasicCached(context, "loss_reasons");
-    // Is the new reason in our list of loss reasons?
-    let lossReasonObject = lossReasons.find(
-      (reason) => reason.name === lossReason
-    );
-    if (lossReasonObject) {
-      payload.loss_reason_id = lossReasonObject.id as string;
-    } else {
-      // We didn't find a match for the provided loss reason; tell user what their options are
-      throw new coda.UserVisibleError(
-        "Loss reason must be " +
-          humanReadableList(lossReasons.map(({ name }) => name))
-      );
-    }
-  }
-
-  console.log("payload", payload);
-  // Update the status (the API will respond with the updated opportunity, so
-  // we'll hang onto that too)
-  let response = await callApi(
-    context,
-    "opportunities/" + opportunityId.id,
-    "PUT",
-    payload
-  );
-
-  let opportunity = await enrichOpportunityResponseWithFetches(
-    context,
-    response.body
-  );
-
-  return opportunity;
-}
-
-export async function assignRecord(
-  context: coda.ExecutionContext,
-  recordType: "opportunity" | "person" | "company",
-  urlOrId: string,
-  assigneeEmail: string
-) {
-  // Determine whether the user supplied an ID or a full URL, and extract the ID
-  const recordId = getIdFromUrlOrId(urlOrId);
-  // Make sure it's the correct type of record
-  checkRecordIdType(recordId.type, recordType);
-  // Make sure the assignee exists in the Copper system
-  let users: types.CopperUserApiResponse[] = await getCopperUsers(context);
-  let assigneeUser = users.find((user) => user.email === assigneeEmail);
-  if (!assigneeUser) {
-    throw new coda.UserVisibleError(
-      `Couldn't find a Copper user with the email address "${assigneeEmail}". Try ${humanReadableList(
-        users.map(({ email }) => email)
-      )}.`
-    );
-  }
-  // Prepare the payload
-  let payload = {
-    assignee_id: assigneeUser.id,
-  };
-  // Prepare the URL
-  let url =
-    RECORD_TYPES.find((type) => type.primary === recordType).plural +
-    "/" +
-    recordId.id;
-  // Update the record (the API will respond with the updated record, so
-  // we'll hang onto that too)
-  let response = await callApi(context, url, "PUT", payload);
-
-  let updatedRecord: any;
-  switch (recordType) {
-    case "opportunity":
-      updatedRecord = await enrichOpportunityResponseWithFetches(
-        context,
-        response.body
-      );
-      break;
-    case "person":
-      updatedRecord = await enrichPersonResponseWithFetches(
-        context,
-        response.body
-      );
-      break;
-    case "company":
-      updatedRecord = await enrichCompanyResponseWithFetches(
-        context,
-        response.body
-      );
-      break;
-  }
-
-  return updatedRecord;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                Autocomplete                                */
-/* -------------------------------------------------------------------------- */
-
-export async function getLossReasons(context: coda.ExecutionContext) {
-  let response = await callApiBasicCached(context, "loss_reasons");
-  return response.map((reason) => reason.name);
-}
-
-export async function getUsers(context: coda.ExecutionContext) {
-  let response = await getCopperUsers(context);
-  return response.map((user) => user.email);
 }

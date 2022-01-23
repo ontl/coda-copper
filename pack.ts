@@ -1,6 +1,8 @@
 import * as coda from "@codahq/packs-sdk";
 import * as helpers from "./helpers";
 import * as schemas from "./schemas";
+import * as constants from "./constants";
+import * as formulas from "./formulas";
 
 export const pack = coda.newPack();
 
@@ -90,7 +92,7 @@ pack.addFormula({
   resultType: coda.ValueType.Object,
   schema: schemas.OpportunitySchema,
   execute: async function ([urlOrId], context) {
-    return helpers.getOpportunity(context, urlOrId);
+    return formulas.getOpportunity(context, urlOrId);
   },
 });
 
@@ -108,7 +110,7 @@ pack.addFormula({
   resultType: coda.ValueType.Object,
   schema: schemas.CompanySchema,
   execute: async function ([urlOrId], context) {
-    return helpers.getCompany(context, urlOrId);
+    return formulas.getCompany(context, urlOrId);
   },
 });
 
@@ -126,7 +128,7 @@ pack.addFormula({
   resultType: coda.ValueType.Object,
   schema: schemas.PersonSchema,
   execute: async function ([urlOrId], context) {
-    return helpers.getPerson(context, urlOrId);
+    return formulas.getPerson(context, urlOrId);
   },
 });
 
@@ -139,7 +141,7 @@ pack.addColumnFormat({
   instructions:
     "Displays all the details of Copper Opportunities, based on their URL or ID",
   formulaName: "Opportunity",
-  matchers: [helpers.copperOpportunityUrlRegex],
+  matchers: [constants.copperOpportunityUrlRegex],
 });
 
 pack.addColumnFormat({
@@ -147,7 +149,7 @@ pack.addColumnFormat({
   instructions:
     "Displays all the details of Copper Companies, based on their URL or ID",
   formulaName: "Company",
-  matchers: [helpers.copperCompanyUrlRegex],
+  matchers: [constants.copperCompanyUrlRegex],
 });
 
 pack.addColumnFormat({
@@ -155,7 +157,7 @@ pack.addColumnFormat({
   instructions:
     "Displays all the details of Copper People (contacts), based on their URL or ID",
   formulaName: "Person",
-  matchers: [helpers.copperPersonUrlRegex],
+  matchers: [constants.copperPersonUrlRegex],
 });
 
 /* -------------------------------------------------------------------------- */
@@ -175,7 +177,7 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "newStatus",
       description: "The new status to set on the opportunity",
-      autocomplete: helpers.STATUS_OPTIONS,
+      autocomplete: constants.STATUS_OPTIONS,
     }),
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -183,7 +185,7 @@ pack.addFormula({
       description: "If changing to Lost, the reason for the loss",
       optional: true,
       autocomplete: async function (context) {
-        return helpers.getLossReasons(context);
+        return formulas.getLossReasons(context);
       },
     }),
   ],
@@ -191,7 +193,7 @@ pack.addFormula({
   schema: schemas.OpportunitySchema,
   isAction: true,
   execute: async function ([urlOrId, newStatus, lossReason], context) {
-    return helpers.updateOpportunityStatus(
+    return formulas.updateOpportunityStatus(
       context,
       urlOrId,
       newStatus,
@@ -214,7 +216,7 @@ pack.addFormula({
       name: "assigneeEmail",
       description: "The email address of the person you want to assign it to",
       autocomplete: async function (context) {
-        return helpers.getUsers(context);
+        return formulas.getUsers(context);
       },
     }),
   ],
@@ -222,7 +224,12 @@ pack.addFormula({
   schema: schemas.OpportunitySchema,
   isAction: true,
   execute: async function ([urlOrId, assigneeEmail], context) {
-    return helpers.assignRecord(context, "opportunity", urlOrId, assigneeEmail);
+    return formulas.assignRecord(
+      context,
+      "opportunity",
+      urlOrId,
+      assigneeEmail
+    );
   },
 });
 
@@ -245,7 +252,7 @@ pack.addFormula({
   schema: schemas.PersonSchema,
   isAction: true,
   execute: async function ([urlOrId, assigneeEmail], context) {
-    return helpers.assignRecord(context, "person", urlOrId, assigneeEmail);
+    return formulas.assignRecord(context, "person", urlOrId, assigneeEmail);
   },
 });
 
@@ -268,6 +275,6 @@ pack.addFormula({
   schema: schemas.CompanySchema,
   isAction: true,
   execute: async function ([urlOrId, assigneeEmail], context) {
-    return helpers.assignRecord(context, "company", urlOrId, assigneeEmail);
+    return formulas.assignRecord(context, "company", urlOrId, assigneeEmail);
   },
 });
