@@ -7,7 +7,7 @@ import type * as types from "./types";
 
 const BASE_URL = "https://api.copper.com/developer_api/v1/";
 const PAGE_SIZE = 50; // max accepted by the API is 200, but that can crash Pack execution
-const STATUS_OPTIONS = ["Open", "Won", "Lost", "Abandoned"];
+export const STATUS_OPTIONS = ["Open", "Won", "Lost", "Abandoned"];
 const RECORD_TYPES = [
   // Copper refers to these record types differently in different contexts. For example,
   // a customer is called a "person" in the UI and in API urls (the plural "people" is
@@ -211,7 +211,9 @@ function humanReadableList(list: string[], conjunction: string = "or") {
 /*                           API Response Formatters                          */
 /* -------------------------------------------------------------------------- */
 
-// NON-FETCH VERSIONS: Enrich from existing data for both records and supporting data
+// NON-FETCH VERSIONS: Take in existing data that has already been returned from
+// the API (for the main record and also its supporting data), and use the
+// supporting data to enrich the main record.
 
 function enrichPersonResponse(
   person: any,
@@ -325,10 +327,13 @@ function enrichOpportunityResponse(
   return opportunity;
 }
 
-// FETCH VERSIONS: Enrich from just a record, by fetching the supporting data
+// FETCH VERSIONS: Enrich from just a record API response, by fetching the supporting data
 
 // Why not use these fetch methods all the time? Because in the case of sync
-// tables, we just want to fetch this info once and re-use it across all records.
+// tables, we just want to fetch this info once and re-use it across all records,
+// without hitting the endpoints again each time. Coda's built-in caching would
+// usually help with this problem, but since some of the endpoints we need to hit
+// are POST (e.g. getCopperUsers()), we can't rely on the built-in caching.
 
 async function enrichPersonResponseWithFetches(
   context: coda.ExecutionContext,
@@ -762,4 +767,18 @@ export async function assignRecord(
   }
 
   return updatedRecord;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                Autocomplete                                */
+/* -------------------------------------------------------------------------- */
+
+export async function getLossReasons(context: coda.ExecutionContext) {
+  let response = await callApiBasicCached(context, "loss_reasons");
+  return response.map((reason) => reason.name);
+}
+
+export async function getUsers(context: coda.ExecutionContext) {
+  let response = await getCopperUsers(context);
+  return response.map((user) => user.email);
 }
