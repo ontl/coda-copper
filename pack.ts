@@ -166,3 +166,110 @@ pack.addColumnFormat({
   formulaName: "Person",
   matchers: [helpers.copperPersonUrlRegex],
 });
+
+/* -------------------------------------------------------------------------- */
+/*                                   Actions                                  */
+/* -------------------------------------------------------------------------- */
+
+pack.addFormula({
+  name: "UpdateOpportunityStatus",
+  description: "Changes the status of a Copper Opportunity",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the opportunity",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "newStatus",
+      description: "The new status to set on the opportunity",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "lossReason",
+      description: "If changing to Lost, the reason for the loss",
+      optional: true,
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+  isAction: true,
+  execute: async function ([urlOrId, newStatus, lossReason], context) {
+    return helpers.updateOpportunityStatus(
+      context,
+      urlOrId,
+      newStatus,
+      lossReason
+    );
+  },
+});
+
+pack.addFormula({
+  name: "AssignOpportunity",
+  description: "Assign a Copper Opportunity to someone on your team",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the opportunity",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "assigneeEmail",
+      description: "The email address of the person you want to assign it to",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+  isAction: true,
+  execute: async function ([urlOrId, assigneeEmail], context) {
+    return helpers.assignRecord(context, "opportunity", urlOrId, assigneeEmail);
+  },
+});
+
+pack.addFormula({
+  name: "AssignPerson",
+  description: "Assign a Copper Person (customer) to someone on your team",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the Copper 'Person' (customer)",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "assigneeEmail",
+      description: "The email address of the assignee (your colleague)",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.PersonSchema,
+  isAction: true,
+  execute: async function ([urlOrId, assigneeEmail], context) {
+    return helpers.assignRecord(context, "person", urlOrId, assigneeEmail);
+  },
+});
+
+pack.addFormula({
+  name: "AssignCompany",
+  description: "Assign a Copper Company to someone on your team",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the company",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "assigneeEmail",
+      description: "The email address of the person you want to assign it to",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.CompanySchema,
+  isAction: true,
+  execute: async function ([urlOrId, assigneeEmail], context) {
+    return helpers.assignRecord(context, "company", urlOrId, assigneeEmail);
+  },
+});

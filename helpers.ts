@@ -7,12 +7,27 @@ import type * as types from "./types";
 
 const BASE_URL = "https://api.copper.com/developer_api/v1/";
 const PAGE_SIZE = 50; // max accepted by the API is 200, but that can crash Pack execution
-const RECORD_TYPES = {
-  // Copper referes to things differently in its URLs; this is the mapping (url style on the left)
-  contact: "person",
-  deal: "opportunity",
-  organization: "company",
-};
+const STATUS_OPTIONS = ["Open", "Won", "Lost", "Abandoned"];
+const RECORD_TYPES = [
+  // Copper refers to these record types differently in different contexts. For example,
+  // a customer is called a "person" in the UI and in API urls (the plural "people" is
+  // used in API urls too). In web URLs though, the legacy term "contact" is used.
+  {
+    primary: "person",
+    plural: "people",
+    webUrl: "contact",
+  },
+  {
+    primary: "company",
+    plural: "companies",
+    webUrl: "organization",
+  },
+  {
+    primary: "opportunity",
+    plural: "opportunities",
+    webUrl: "deal",
+  },
+];
 export const copperRecordUrlRegex = new RegExp(
   "/app.copper.com/companies/[0-9]+/app#/.*(contact|deal|organization)/([0-9]{5,})"
 );
@@ -41,7 +56,7 @@ export const copperCompanyUrlRegex = new RegExp(
 async function callApi(
   context: coda.ExecutionContext,
   endpoint: string,
-  method: "GET" | "POST" = "POST",
+  method: "GET" | "POST" | "PUT" = "POST",
   payload?: { [key: string]: any },
   cacheTtlSecs: number = 60
 ) {
@@ -90,20 +105,6 @@ async function callApiBasicCached(
 }
 
 /**
- * Contatenates the components of a Copper physical address into a single string
- * @param address object with street, city, state, country, postal_code like what Copper returns
- */
-function concatenateAddress(address: types.AddressApiProperty) {
-  let concatenatedAddress: string = "";
-  if (address?.street) concatenatedAddress += address.street + ", ";
-  if (address?.city) concatenatedAddress += address.city + ", ";
-  if (address?.state) concatenatedAddress += address.state + ", ";
-  if (address?.country) concatenatedAddress += address.country + ", ";
-  if (address?.postal_code) concatenatedAddress += address.postal_code + ", ";
-  return concatenatedAddress.slice(0, -2);
-}
-
-/**
  * Gets users in the Copper organization, for mapping to assignees/owners of records
  * @returns array of Copper users (objects with id, name, email)
  */
@@ -117,6 +118,20 @@ async function getCopperUsers(context: coda.ExecutionContext) {
   );
   let copperUsers: types.CopperUserApiResponse[] = response.body;
   return copperUsers;
+}
+
+/**
+ * Contatenates the components of a Copper physical address into a single string
+ * @param address object with street, city, state, country, postal_code like what Copper returns
+ */
+function concatenateAddress(address: types.AddressApiProperty) {
+  let concatenatedAddress: string = "";
+  if (address?.street) concatenatedAddress += address.street + ", ";
+  if (address?.city) concatenatedAddress += address.city + ", ";
+  if (address?.state) concatenatedAddress += address.state + ", ";
+  if (address?.country) concatenatedAddress += address.country + ", ";
+  if (address?.postal_code) concatenatedAddress += address.postal_code + ", ";
+  return concatenatedAddress.slice(0, -2);
 }
 
 /**
@@ -149,8 +164,10 @@ function getIdFromUrlOrId(idOrUrl: string) {
     let matches = copperRecordUrlRegex.exec(idOrUrl);
     if (matches) {
       // The type is the second capture group, accessible via [1]. convert it from the
-      // nomenclature used in Copper's URLs to the nomenclature used everywhere else
-      let recordType = RECORD_TYPES[matches[1]];
+      // nomenclature used in Copper's URLs to the nomenclature used everywhere else (the 'primary')
+      let recordType = RECORD_TYPES.find(
+        (type) => type.webUrl === matches[1]
+      ).primary;
       return {
         id: matches[2],
         type: recordType,
@@ -178,18 +195,24 @@ function addIndefiniteArticle(word: string) {
   return article + " " + word;
 }
 
+function titleCase(string: string) {
+  return string[0].toUpperCase() + string.slice(1).toLowerCase();
+}
+
+function humanReadableList(list: string[], conjunction: string = "or") {
+  if (list.length === 1) return list[0];
+  if (list.length === 2) return list.join(" " + conjunction + " ");
+  return (
+    list.slice(0, -1).join(", ") + ", " + conjunction + " " + list.slice(-1)
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*                           API Response Formatters                          */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Massages a Copper person response, ready for ingesting into Person schema
- * @param person person object direct from Copper API
- * @param copperAccountId for building Copper URLs
- * @param users array of Copper users for mapping to assignees/owners of records
- * @param contactTypes array of Copper contact types
- * @returns version of the person object with additional fields
- */
+// NON-FETCH VERSIONS: Enrich from existing data for both records and supporting data
+
 function enrichPersonResponse(
   person: any,
   copperAccountId: string,
@@ -300,6 +323,81 @@ function enrichOpportunityResponse(
     }
   }
   return opportunity;
+}
+
+// FETCH VERSIONS: Enrich from just a record, by fetching the supporting data
+
+// Why not use these fetch methods all the time? Because in the case of sync
+// tables, we just want to fetch this info once and re-use it across all records.
+
+async function enrichPersonResponseWithFetches(
+  context: coda.ExecutionContext,
+  person: types.PersonApiResponse
+) {
+  // Fetch the enrichment data we'll need
+  const [
+    users, // Copper users who might be "assignees"
+    copperAccount, // for building Copper URLs
+    contactTypes,
+  ] = await Promise.all([
+    getCopperUsers(context),
+    callApiBasicCached(context, "account"),
+    callApiBasicCached(context, "contact_types"),
+  ]);
+
+  let enrichedPerson = await enrichPersonResponse(
+    person,
+    copperAccount.id,
+    users,
+    contactTypes
+  );
+
+  return enrichedPerson;
+}
+
+async function enrichCompanyResponseWithFetches(
+  context: coda.ExecutionContext,
+  company: types.CompanyApiResponse
+) {
+  // Fetch the enrichment data we'll need
+  const [users, copperAccount] = await Promise.all([
+    getCopperUsers(context),
+    callApiBasicCached(context, "account"),
+  ]);
+
+  let enrichedCompany = await enrichCompanyResponse(
+    company,
+    copperAccount.id,
+    users
+  );
+
+  return enrichedCompany;
+}
+
+async function enrichOpportunityResponseWithFetches(
+  context: coda.ExecutionContext,
+  opportunity: types.OpportunityApiResponse
+) {
+  // Fetch the enrichment data we'll need
+  const [users, pipelines, customerSources, lossReasons, copperAccount] =
+    await Promise.all([
+      getCopperUsers(context),
+      callApiBasicCached(context, "pipelines"),
+      callApiBasicCached(context, "customer_sources"),
+      callApiBasicCached(context, "loss_reasons"),
+      callApiBasicCached(context, "account"),
+    ]);
+
+  let enrichedOpportunity = await enrichOpportunityResponse(
+    opportunity,
+    copperAccount.id,
+    users,
+    pipelines,
+    customerSources,
+    lossReasons
+  );
+
+  return enrichedOpportunity;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -545,4 +643,123 @@ export async function getCompany(
   );
 
   return company;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               Action Formulas                              */
+/* -------------------------------------------------------------------------- */
+
+export async function updateOpportunityStatus(
+  context: coda.ExecutionContext,
+  urlOrId: string,
+  newStatus: string, // the loss reason in plain text (not the loss reason ID)
+  lossReason?: string // if changing the status to lost, accept a loss reason
+) {
+  // Determine whether the user supplied an ID or a full URL, and extract the ID
+  const opportunityId = getIdFromUrlOrId(urlOrId);
+  // Make sure it's the correct type of record
+  checkRecordIdType(opportunityId.type, "opportunity");
+  // Make sure the status is valid
+  newStatus = titleCase(newStatus);
+  if (!STATUS_OPTIONS.includes(newStatus)) {
+    throw new coda.UserVisibleError(
+      "New status must be " + humanReadableList(STATUS_OPTIONS)
+    );
+  }
+
+  // Prepare the payload, including loss reason if appropriate
+  let payload: any = {
+    status: newStatus,
+  };
+  if (lossReason && newStatus === "Lost") {
+    let lossReasons = await callApiBasicCached(context, "loss_reasons");
+    // Is the new reason in our list of loss reasons?
+    let lossReasonObject = lossReasons.find(
+      (reason) => reason.name === lossReason
+    );
+    if (lossReasonObject) {
+      payload.loss_reason_id = lossReasonObject.id as string;
+    } else {
+      // We didn't find a match for the provided loss reason; tell user what their options are
+      throw new coda.UserVisibleError(
+        "Loss reason must be " +
+          humanReadableList(lossReasons.map(({ name }) => name))
+      );
+    }
+  }
+
+  console.log("payload", payload);
+  // Update the status (the API will respond with the updated opportunity, so
+  // we'll hang onto that too)
+  let response = await callApi(
+    context,
+    "opportunities/" + opportunityId.id,
+    "PUT",
+    payload
+  );
+
+  let opportunity = await enrichOpportunityResponseWithFetches(
+    context,
+    response.body
+  );
+
+  return opportunity;
+}
+
+export async function assignRecord(
+  context: coda.ExecutionContext,
+  recordType: "opportunity" | "person" | "company",
+  urlOrId: string,
+  assigneeEmail: string
+) {
+  // Determine whether the user supplied an ID or a full URL, and extract the ID
+  const recordId = getIdFromUrlOrId(urlOrId);
+  // Make sure it's the correct type of record
+  checkRecordIdType(recordId.type, recordType);
+  // Make sure the assignee exists in the Copper system
+  let users: types.CopperUserApiResponse[] = await getCopperUsers(context);
+  let assigneeUser = users.find((user) => user.email === assigneeEmail);
+  if (!assigneeUser) {
+    throw new coda.UserVisibleError(
+      `Couldn't find a Copper user with the email address "${assigneeEmail}". Try ${humanReadableList(
+        users.map(({ email }) => email)
+      )}.`
+    );
+  }
+  // Prepare the payload
+  let payload = {
+    assignee_id: assigneeUser.id,
+  };
+  // Prepare the URL
+  let url =
+    RECORD_TYPES.find((type) => type.primary === recordType).plural +
+    "/" +
+    recordId.id;
+  // Update the record (the API will respond with the updated record, so
+  // we'll hang onto that too)
+  let response = await callApi(context, url, "PUT", payload);
+
+  let updatedRecord: any;
+  switch (recordType) {
+    case "opportunity":
+      updatedRecord = await enrichOpportunityResponseWithFetches(
+        context,
+        response.body
+      );
+      break;
+    case "person":
+      updatedRecord = await enrichPersonResponseWithFetches(
+        context,
+        response.body
+      );
+      break;
+    case "company":
+      updatedRecord = await enrichCompanyResponseWithFetches(
+        context,
+        response.body
+      );
+      break;
+  }
+
+  return updatedRecord;
 }
