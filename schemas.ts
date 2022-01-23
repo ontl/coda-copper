@@ -370,7 +370,8 @@ export const OpportunitySchema = coda.makeObjectSchema({
     },
     assignee: CopperUserSchema,
     closeDate: {
-      type: coda.ValueType.String, // yep, for some reason this is a string while others are unix epoch
+      // for some reason this is a MM/DD/YYYY or DD/MM/YYYY string, while others are unix epoch
+      type: coda.ValueType.String,
       codaType: coda.ValueHintType.Date,
       description: "Close date of the opportunity",
       fromKey: "close_date",
@@ -415,6 +416,10 @@ export const OpportunitySchema = coda.makeObjectSchema({
     status: {
       type: coda.ValueType.String,
       description: "Status of the opportunity",
+    },
+    priority: {
+      type: coda.ValueType.String,
+      description: "Priority of the opportunity (None, Low, Medium, High)",
     },
     tags: {
       type: coda.ValueType.Array,
