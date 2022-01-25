@@ -4,6 +4,151 @@ import * as types from "./types";
 import * as helpers from "./helpers";
 
 /* -------------------------------------------------------------------------- */
+/*                            Sync Table Functions                            */
+/* -------------------------------------------------------------------------- */
+/**
+ * Syncs opportunities from Copper
+ */
+
+export async function syncOpportunities(context: coda.SyncExecutionContext) {
+  // If there is a previous continuation, grab its page number. Otherwise,
+  // start at page 1.
+  let pageNumber: number =
+    (context.sync.continuation?.pageNumber as number) || 1;
+
+  // Get a page of results, as well as all the background info we'll need to enrich
+  // the records we get back from the Copper API
+  const [
+    response, // page of results from Copper API
+    users, // Copper users who might be "assignees"
+    copperAccount, // for building Copper URLs
+    pipelines,
+    customerSources,
+    lossReasons,
+  ] = await Promise.all([
+    helpers.callApi(context, "opportunities/search", "POST", {
+      page_size: constants.PAGE_SIZE,
+      page_number: pageNumber,
+      sort_by: "date_created",
+      sort_direction: "desc",
+    }),
+    helpers.getCopperUsers(context),
+    helpers.callApiBasicCached(context, "account"),
+    helpers.callApiBasicCached(context, "pipelines"),
+    helpers.callApiBasicCached(context, "customer_sources"),
+    helpers.callApiBasicCached(context, "loss_reasons"),
+  ]);
+
+  // Process the results
+  let opportunities: types.OpportunityApiResponse[] = response.body.map(
+    (opportunity: types.OpportunityApiResponse) =>
+      helpers.enrichOpportunityResponse(
+        opportunity,
+        copperAccount.id,
+        users,
+        pipelines,
+        customerSources,
+        lossReasons,
+        true // include references to Person and Company sync tables
+      )
+  );
+
+  // If we got a full page of results, that means there are probably more results
+  // on the next page. Set up a continuation to grab the next page if so.
+  let nextContinuation = {};
+  if ((opportunities.length = constants.PAGE_SIZE))
+    nextContinuation = { pageNumber: pageNumber + 1 };
+
+  return {
+    result: opportunities,
+    continuation: nextContinuation,
+  };
+}
+/**
+ * Syncs companies from Copper
+ */
+
+export async function syncCompanies(context: coda.SyncExecutionContext) {
+  // If there is a previous continuation, grab its page number. Otherwise,
+  // start at page 1.
+  let pageNumber: number =
+    (context.sync.continuation?.pageNumber as number) || 1;
+
+  // Get a page of results, the Copper account info we'll need for building URLs,
+  // and the list of users who might be "assignees"
+  const [response, copperAccount, users] = await Promise.all([
+    helpers.callApi(context, "companies/search", "POST", {
+      page_size: constants.PAGE_SIZE,
+      page_number: pageNumber,
+      sort_by: "name",
+    }),
+    helpers.callApiBasicCached(context, "account"),
+    helpers.getCopperUsers(context),
+  ]);
+
+  // Process the results by passing each company to the enrichment function
+  let companies: types.CompanyApiResponse[] = response.body.map(
+    (company: types.CompanyApiResponse) =>
+      helpers.enrichCompanyResponse(company, copperAccount.id, users)
+  );
+
+  // If we got a full page of results, that means there are probably more results
+  // on the next page. Set up a continuation to grab the next page if so.
+  let nextContinuation = undefined;
+  if ((companies.length = constants.PAGE_SIZE))
+    nextContinuation = { pageNumber: pageNumber + 1 };
+
+  return {
+    result: companies,
+    continuation: nextContinuation,
+  };
+}
+/**
+ * Syncs Person records (contacts) from Copper
+ */
+
+export async function syncPeople(context: coda.SyncExecutionContext) {
+  // If there is a previous continuation, grab its page number. Otherwise,
+  // start at page 1.
+  let pageNumber: number =
+    (context.sync.continuation?.pageNumber as number) || 1;
+
+  // Get a page of results, as well as all the background info we'll need to enrich
+  // the records we get back from the Copper API
+  const [response, users, copperAccount, contactTypes] = await Promise.all([
+    helpers.callApi(context, "people/search", "POST", {
+      page_size: constants.PAGE_SIZE,
+      page_number: pageNumber,
+      sort_by: "name",
+    }),
+    helpers.getCopperUsers(context),
+    helpers.callApiBasicCached(context, "account"),
+    helpers.callApiBasicCached(context, "contact_types"),
+  ]);
+
+  // Process the results by sending each person to the enrichment function
+  let people = response.body.map((person) =>
+    helpers.enrichPersonResponse(person, copperAccount.id, users, contactTypes)
+  );
+
+  console.log(
+    "First person's company data: ",
+    JSON.stringify(people[0].company)
+  );
+
+  // If we got a full page of results, that means there are probably more results
+  // on the next page. Set up a continuation to grab the next page if so.
+  let nextContinuation = undefined;
+  if ((people.length = constants.PAGE_SIZE))
+    nextContinuation = { pageNumber: pageNumber + 1 };
+
+  return {
+    result: people,
+    continuation: nextContinuation,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /*                               Getter Formulas                              */
 /* -------------------------------------------------------------------------- */
 
