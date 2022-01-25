@@ -187,8 +187,8 @@ export function enrichPersonResponse(
   // prepare reference to companies table
   if (person.company_id) {
     person.company = {
-      companyId: person.company_id,
-      companyName: person.company_name,
+      id: person.company_id,
+      name: person.company_name,
     };
   }
   if (users) {
@@ -272,13 +272,13 @@ export function enrichOpportunityResponse(
   if (withReferences) {
     if (opportunity.company_id) {
       opportunity.company = {
-        companyId: opportunity.company_id,
-        companyName: opportunity.company_name,
+        id: opportunity.company_id,
+        name: opportunity.company_name,
       };
     }
     if (opportunity.primary_contact_id) {
       opportunity.primaryContact = {
-        personId: opportunity.primary_contact_id,
+        id: opportunity.primary_contact_id,
         // we could pull the name from the API but that would be vv expensive. Instead,
         // let's set a default that will be overridden by a successful reference to
         fullName: "Not found",

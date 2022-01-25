@@ -1,5 +1,4 @@
 import * as coda from "@codahq/packs-sdk";
-import * as helpers from "./helpers";
 import * as schemas from "./schemas";
 import * as constants from "./constants";
 import * as formulas from "./formulas";
@@ -37,7 +36,7 @@ pack.addSyncTable({
     cacheTtlSecs: 0, // don't cache results
     parameters: [],
     execute: async function ([], context) {
-      return helpers.syncOpportunities(context);
+      return formulas.syncOpportunities(context);
     },
   },
 });
@@ -52,7 +51,7 @@ pack.addSyncTable({
     cacheTtlSecs: 0, // don't cache results
     parameters: [],
     execute: async function ([], context) {
-      return helpers.syncCompanies(context);
+      return formulas.syncCompanies(context);
     },
   },
 });
@@ -67,7 +66,7 @@ pack.addSyncTable({
     cacheTtlSecs: 0, // don't cache results
     parameters: [],
     execute: async function ([], context) {
-      return helpers.syncPeople(context);
+      return formulas.syncPeople(context);
     },
   },
 });
