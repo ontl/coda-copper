@@ -1,4 +1,5 @@
 import * as coda from "@codahq/packs-sdk";
+import * as helpers from "./helpers";
 
 /* -------------------------------------------------------------------------- */
 /*                            Common object schemas                           */
@@ -475,7 +476,6 @@ export const OpportunitySchema = coda.makeObjectSchema({
       description: "Date the opportunity was last modified on",
       fromKey: "date_modified",
     },
-    // TODO: Implement custom fields
     url: {
       type: coda.ValueType.String,
       codaType: coda.ValueHintType.Url,
@@ -484,119 +484,110 @@ export const OpportunitySchema = coda.makeObjectSchema({
   },
 });
 
-// Sample response for Opportunities
-//         "id": 2827699,
-//         "name": "25 Office Chairs (sample)",
-//         "assignee_id": null,
-//         "close_date": "1/16/2017",
-//         "company_id": 9607580,
-//         "company_name": "Dunder Mifflin (sample)",
-//         "customer_source_id": 331242,
-//         "details": "Opportunities are created for People and Companies that are interested in buying your products or services. Create Opportunities for People and Companies to move them through one of your Pipelines.",
-//         "loss_reason_id": null,
-//         "pipeline_id": 213214,
-//         "pipeline_stage_id": 987793,
-//         "primary_contact_id": null,
-//         "priority": "None",
-//         "status": "Open",
-//         "tags": [],
-//         "interaction_count": 0,
-//         "monetary_value": 75000,
-//         "win_probability": 40,
-//         "date_last_contacted": null,
-//         "leads_converted_from": [],
-//         "date_lead_created": null,
-//         "date_created": 1483988829,
-//         "date_modified": 1489018922,
-//         "custom_fields": [
-//             {
-//                 "custom_field_definition_id": 126240,
-//                 "value": null
-//             },
-//             {
-//                 "custom_field_definition_id": 103481,
-//                 "value": null
-//             },
-//             {
-//                 "custom_field_definition_id": 100764,
-//                 "value": null
-//             }
-//         ]
-//     },
+/* -------------------------------------------------------------------------- */
+/*                         Dynamic Sync Table Schemas                         */
+/* -------------------------------------------------------------------------- */
 
-// Sample response for companies
-// "id": 13358412,
-// "name": "Demo Company",
-// "address": {
-//     "street": "123 Main St",
-//     "city": "San Francisco",
-//     "state": "CA",
-//     "postal_code": "94105",
-//     "country": null
-// },
-// "assignee_id": null,
-// "contact_type_id": null,
-// "details": "This is a demo company",
-// "email_domain": "democompany.com",
-// "phone_numbers": [
-//     {
-//         "number": "415-123-45678",
-//         "category": "work"
-//     }
-// ],
-// "socials": [],
-// "tags": [],
-// "websites": [
-//     {
-//         "url": "http://democompany.com",
-//         "category": "work"
-//     }
-// ],
-// "custom_fields": [
-//     {
-//         "custom_field_definition_id": 100764,
-//         "value": null
-//     },
-//     {
-//         "custom_field_definition_id": 103481,
-//         "value": null
-//     }
-// ],
-// "interaction_count": 0,
-// "date_created": 1496707930,
-// "date_modified": 1496707932
-// }
+export async function getSchemaWithCustomFields(
+  context: coda.ExecutionContext,
+  recordType: "person" | "company" | "opportunity"
+) {
+  // First, load up the appropriate static schema, which we'll add on to
+  let staticSchema: coda.Schema;
+  switch (recordType) {
+    case "person":
+      staticSchema = PersonSchema;
+      break;
+    case "company":
+      staticSchema = CompanySchema;
+      break;
+    case "opportunity":
+      staticSchema = OpportunitySchema;
+      break;
+    default:
+      throw new coda.UserVisibleError(
+        "There was an error generating the sync table"
+      );
+  }
 
-// sample API response for people:
-//         "id": 27140338,
-//         "name": "My Contact",
-//         "prefix": null,
-//         "first_name": "My",
-//         "middle_name": null,
-//         "last_name": "Contact",
-//         "suffix": null,
-//         "address": null,
-//         "assignee_id": null,
-//         "company_id": null,
-//         "company_name": null,
-//         "contact_type_id": 451492,
-//         "details": null,
-//         "emails": [],
-//         "phone_numbers": [],
-//         "socials": [],
-//         "tags": [],
-//         "title": null,
-//         "websites": [],
-//         "custom_fields": [
-//             {
-//                 "custom_field_definition_id": 100764,
-//                 "value": "Text fields are 255 chars or less!"
-//             },
-//             {
-//                 "custom_field_definition_id": 103481,
-//                 "value": "Text area fields can have long text content"
-//             }
-//         ],
-//         "date_created": 1490044880,
-//         "date_modified": 1490044880,
-//         "interaction_count": 0
+  // Start with the static properties
+  let properties: coda.ObjectSchemaProperties = staticSchema.properties;
+
+  // Go get the list of custom fields
+  let allCustomFields = await helpers.callApiBasicCached(
+    context,
+    "custom_field_definitions"
+  );
+
+  // Filter to just the custom fields that apply to this record type
+  let applicableCustomFields = allCustomFields.filter((customField) =>
+    customField.available_on.includes(recordType)
+  );
+
+  // Format the custom fields as schema properties, and add them to the schema
+  for (let customField of applicableCustomFields) {
+    let name = customField.name;
+    console.log("Field name:", name);
+    let propertySchema;
+    // Build appropriate field schemas based on the type of custom field
+    // Note: we're not currently fully implementing the "Connect" field type,
+    // but could in future given sufficient user demand
+    switch (customField.type) {
+      case "Url":
+        propertySchema = coda.makeSchema({
+          type: coda.ValueType.String,
+          codaType: coda.ValueHintType.Url,
+        });
+        break;
+      case "Date":
+        propertySchema = coda.makeSchema({
+          type: coda.ValueType.Number,
+          codaType: coda.ValueHintType.Date,
+        });
+        break;
+      case "Checkbox":
+        propertySchema = coda.makeSchema({ type: coda.ValueType.Boolean });
+        break;
+      case "Float":
+        propertySchema = coda.makeSchema({ type: coda.ValueType.Number });
+        break;
+      case "Percentage":
+        propertySchema = coda.makeSchema({ type: coda.ValueType.Number });
+        break;
+      case "Currency":
+        propertySchema = coda.makeSchema({
+          type: coda.ValueType.Number,
+          codaType: coda.ValueHintType.Currency,
+        });
+        break;
+      case "MultiSelect":
+        propertySchema = coda.makeSchema({
+          type: coda.ValueType.Array,
+          items: coda.makeSchema({
+            type: coda.ValueType.String,
+          }),
+        });
+        break;
+      default:
+        // including String, Text, Dropdown, Connect
+        propertySchema = coda.makeSchema({ type: coda.ValueType.String });
+    }
+    // Add the custom field property to the schema
+    console.log("Property Schema:", JSON.stringify(propertySchema));
+    properties[name] = propertySchema;
+  }
+
+  let schema = coda.makeObjectSchema({
+    properties: properties,
+    primary: staticSchema.primary,
+    id: staticSchema.id,
+    featured: staticSchema.featured,
+    identity: staticSchema.identity,
+  });
+
+  // Return an array schema as the result.
+  return coda.makeSchema({
+    type: coda.ValueType.Array,
+    items: schema,
+  });
+}

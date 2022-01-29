@@ -28,8 +28,18 @@ pack.setUserAuthentication({
 
 pack.addSyncTable({
   name: "Opportunities",
-  schema: schemas.OpportunitySchema,
   identityName: "Opportunity",
+  // Copper users can define custom fields, and we want to be able to include those
+  // as columns. That means we'll be making a dynamic schema. We still have to define
+  // a regular static schema first, which is used as a placeholder until the full
+  // dynamic schema is generated.
+  schema: schemas.OpportunitySchema,
+  // Now we'll add a dynamic version of the schema, which includes the custom fields
+  dynamicOptions: {
+    getSchema: async function (context) {
+      return schemas.getSchemaWithCustomFields(context, "opportunity");
+    },
+  },
   formula: {
     name: "SyncOpportunities",
     description: "Sync opportunities from Copper",
@@ -43,8 +53,13 @@ pack.addSyncTable({
 
 pack.addSyncTable({
   name: "Companies",
-  schema: schemas.CompanySchema,
   identityName: "Company",
+  schema: schemas.CompanySchema,
+  dynamicOptions: {
+    getSchema: async function (context) {
+      return schemas.getSchemaWithCustomFields(context, "company");
+    },
+  },
   formula: {
     name: "SyncCompanies",
     description: "Sync companies from Copper",
@@ -58,8 +73,13 @@ pack.addSyncTable({
 
 pack.addSyncTable({
   name: "People",
-  schema: schemas.PersonSchema,
   identityName: "Person",
+  schema: schemas.PersonSchema,
+  dynamicOptions: {
+    getSchema: async function (context) {
+      return schemas.getSchemaWithCustomFields(context, "person");
+    },
+  },
   formula: {
     name: "SyncPeople",
     description: "Sync people from Copper",

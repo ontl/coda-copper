@@ -117,6 +117,18 @@ export interface PipelineApiResponse {
   }[];
 }
 
+export interface CustomFieldDefinitionApiResponse {
+  id: string;
+  name: string;
+  data_type: "String" | "Tumber" | "Dropdown" | "Date";
+  available_on: string[];
+  options?: {
+    id: string;
+    name: string;
+    rank: number;
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /*                            Formula Return Types                            */
 /* -------------------------------------------------------------------------- */

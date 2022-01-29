@@ -25,18 +25,21 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     pipelines,
     customerSources,
     lossReasons,
+    customFieldDefinitions,
   ] = await Promise.all([
     helpers.callApi(context, "opportunities/search", "POST", {
       page_size: constants.PAGE_SIZE,
       page_number: pageNumber,
       sort_by: "date_created",
       sort_direction: "desc",
+      custom_field_computed_values: true,
     }),
     helpers.getCopperUsers(context),
     helpers.callApiBasicCached(context, "account"),
     helpers.callApiBasicCached(context, "pipelines"),
     helpers.callApiBasicCached(context, "customer_sources"),
     helpers.callApiBasicCached(context, "loss_reasons"),
+    helpers.callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   // Process the results
@@ -49,6 +52,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
         pipelines,
         customerSources,
         lossReasons,
+        customFieldDefinitions,
         true // include references to Person and Company sync tables
       )
   );
@@ -76,20 +80,28 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
 
   // Get a page of results, the Copper account info we'll need for building URLs,
   // and the list of users who might be "assignees"
-  const [response, copperAccount, users] = await Promise.all([
-    helpers.callApi(context, "companies/search", "POST", {
-      page_size: constants.PAGE_SIZE,
-      page_number: pageNumber,
-      sort_by: "name",
-    }),
-    helpers.callApiBasicCached(context, "account"),
-    helpers.getCopperUsers(context),
-  ]);
+  const [response, copperAccount, users, customFieldDefinitions] =
+    await Promise.all([
+      helpers.callApi(context, "companies/search", "POST", {
+        page_size: constants.PAGE_SIZE,
+        page_number: pageNumber,
+        sort_by: "name",
+        custom_field_computed_values: true,
+      }),
+      helpers.callApiBasicCached(context, "account"),
+      helpers.getCopperUsers(context),
+      helpers.callApiBasicCached(context, "custom_field_definitions"),
+    ]);
 
   // Process the results by passing each company to the enrichment function
   let companies: types.CompanyApiResponse[] = response.body.map(
     (company: types.CompanyApiResponse) =>
-      helpers.enrichCompanyResponse(company, copperAccount.id, users)
+      helpers.enrichCompanyResponse(
+        company,
+        copperAccount.id,
+        users,
+        customFieldDefinitions
+      )
   );
 
   // If we got a full page of results, that means there are probably more results
@@ -115,25 +127,29 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
 
   // Get a page of results, as well as all the background info we'll need to enrich
   // the records we get back from the Copper API
-  const [response, users, copperAccount, contactTypes] = await Promise.all([
-    helpers.callApi(context, "people/search", "POST", {
-      page_size: constants.PAGE_SIZE,
-      page_number: pageNumber,
-      sort_by: "name",
-    }),
-    helpers.getCopperUsers(context),
-    helpers.callApiBasicCached(context, "account"),
-    helpers.callApiBasicCached(context, "contact_types"),
-  ]);
+  const [response, users, copperAccount, contactTypes, customFieldDefinitions] =
+    await Promise.all([
+      helpers.callApi(context, "people/search", "POST", {
+        page_size: constants.PAGE_SIZE,
+        page_number: pageNumber,
+        sort_by: "name",
+        custom_field_computed_values: true,
+      }),
+      helpers.getCopperUsers(context),
+      helpers.callApiBasicCached(context, "account"),
+      helpers.callApiBasicCached(context, "contact_types"),
+      helpers.callApiBasicCached(context, "custom_field_definitions"),
+    ]);
 
   // Process the results by sending each person to the enrichment function
   let people = response.body.map((person) =>
-    helpers.enrichPersonResponse(person, copperAccount.id, users, contactTypes)
-  );
-
-  console.log(
-    "First person's company data: ",
-    JSON.stringify(people[0].company)
+    helpers.enrichPersonResponse(
+      person,
+      copperAccount.id,
+      users,
+      contactTypes,
+      customFieldDefinitions
+    )
   );
 
   // If we got a full page of results, that means there are probably more results
@@ -171,13 +187,17 @@ export async function getOpportunity(
     pipelines,
     customerSources,
     lossReasons,
+    customFieldDefinitions,
   ] = await Promise.all([
-    helpers.callApi(context, "opportunities/" + opportunityId.id, "GET"),
+    helpers.callApi(context, "opportunities/" + opportunityId.id, "GET", {
+      custom_field_computed_values: true,
+    }),
     helpers.getCopperUsers(context),
     helpers.callApiBasicCached(context, "account"),
     helpers.callApiBasicCached(context, "pipelines"),
     helpers.callApiBasicCached(context, "customer_sources"),
     helpers.callApiBasicCached(context, "loss_reasons"),
+    helpers.callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let opportunity = await helpers.enrichOpportunityResponse(
@@ -187,6 +207,7 @@ export async function getOpportunity(
     pipelines,
     customerSources,
     lossReasons,
+    customFieldDefinitions,
     false // don't include references to Person and Company sync tables
   );
 
@@ -207,18 +228,23 @@ export async function getPerson(
     users, // Copper users who might be "assignees"
     copperAccount, // for building Copper URLs
     contactTypes,
+    customFieldDefinitions,
   ] = await Promise.all([
-    helpers.callApi(context, "people/" + opportunityId.id, "GET"),
+    helpers.callApi(context, "people/" + opportunityId.id, "GET", {
+      custom_field_computed_values: true,
+    }),
     helpers.getCopperUsers(context),
     helpers.callApiBasicCached(context, "account"),
     helpers.callApiBasicCached(context, "contact_types"),
+    helpers.callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let person = await helpers.enrichPersonResponse(
     response.body,
     copperAccount.id,
     users,
-    contactTypes
+    contactTypes,
+    customFieldDefinitions
   );
 
   return person;
@@ -237,16 +263,21 @@ export async function getCompany(
     response, // opportunity record from Copper API
     users, // Copper users who might be "assignees"
     copperAccount, // for building Copper URLs
+    customFieldDefinitions, // account-level list of custom fields
   ] = await Promise.all([
-    helpers.callApi(context, "companies/" + opportunityId.id, "GET"),
+    helpers.callApi(context, "companies/" + opportunityId.id, "GET", {
+      custom_field_computed_values: true,
+    }),
     helpers.getCopperUsers(context),
     helpers.callApiBasicCached(context, "account"),
+    helpers.callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let company = await helpers.enrichCompanyResponse(
     response.body,
     copperAccount.id,
-    users
+    users,
+    customFieldDefinitions
   );
 
   return company;
@@ -295,7 +326,6 @@ export async function updateOpportunityStatus(
     }
   }
 
-  console.log("payload", payload);
   // Update the status (the API will respond with the updated opportunity, so
   // we'll hang onto that too)
   let response = await helpers.callApi(
