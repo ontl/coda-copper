@@ -90,15 +90,9 @@ export const CompanySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "companyId",
   primary: "companyName",
-  featured: ["fullAddress", "emailDomain", "interactionCount", "url"],
+  featured: ["fullAddress", "copperUrl", "websites"],
   identity: { name: "Company" },
   properties: {
-    companyId: {
-      type: coda.ValueType.String,
-      description: "Company ID on Copper",
-      required: true,
-      fromKey: "id",
-    },
     companyName: {
       type: coda.ValueType.String,
       description: "Company name",
@@ -109,6 +103,50 @@ export const CompanySchema = coda.makeObjectSchema({
       // synthetic address property (combining all address fields)
       type: coda.ValueType.String,
       description: "Company address",
+    },
+    assignee: CopperUserSchema,
+    tags: {
+      type: coda.ValueType.Array,
+      description: "Tags",
+      items: coda.makeSchema({
+        type: coda.ValueType.String,
+      }),
+    },
+    copperUrl: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "View Company on Copper",
+      fromKey: "url",
+    },
+    details: {
+      type: coda.ValueType.String,
+      description: "Company details",
+    },
+    phoneNumbers: {
+      type: coda.ValueType.Array,
+      description: "Phone numbers",
+      fromKey: "phone_numbers",
+      items: PhoneNumberSchema,
+    },
+    emailDomain: {
+      type: coda.ValueType.String,
+      description: "Email domain",
+      fromKey: "email_domain",
+    },
+    interactionCount: {
+      type: coda.ValueType.Number,
+      description: "Number of interactions with this company",
+      fromKey: "interaction_count",
+    },
+    socials: {
+      type: coda.ValueType.Array,
+      description: "Social media links",
+      items: SocialSchema,
+    },
+    websites: {
+      type: coda.ValueType.Array,
+      description: "Websites",
+      items: WebsiteSchema,
     },
     street: {
       type: coda.ValueType.String,
@@ -135,54 +173,6 @@ export const CompanySchema = coda.makeObjectSchema({
       description: "Address: country",
       fromKey: "address.country",
     },
-    assigneeId: {
-      type: coda.ValueType.String,
-      description: "Assignee ID on Copper",
-      fromKey: "assignee_id",
-    },
-    assignee: CopperUserSchema,
-    contactTypeId: {
-      type: coda.ValueType.String,
-      description: "Contact type ID on Copper",
-      fromKey: "contact_type_id",
-    },
-    details: {
-      type: coda.ValueType.String,
-      description: "Company details",
-    },
-    emailDomain: {
-      type: coda.ValueType.String,
-      description: "Email domain",
-      fromKey: "email_domain",
-    },
-    phoneNumbers: {
-      type: coda.ValueType.Array,
-      description: "Phone numbers",
-      fromKey: "phone_numbers",
-      items: PhoneNumberSchema,
-    },
-    socials: {
-      type: coda.ValueType.Array,
-      description: "Social media links",
-      items: SocialSchema,
-    },
-    tags: {
-      type: coda.ValueType.Array,
-      description: "Tags",
-      items: coda.makeSchema({
-        type: coda.ValueType.String,
-      }),
-    },
-    websites: {
-      type: coda.ValueType.Array,
-      description: "Websites",
-      items: WebsiteSchema,
-    },
-    interactionCount: {
-      type: coda.ValueType.Number,
-      description: "Number of interactions with this company",
-      fromKey: "interaction_count",
-    },
     dateCreated: {
       type: coda.ValueType.Number,
       codaType: coda.ValueHintType.Date,
@@ -195,10 +185,21 @@ export const CompanySchema = coda.makeObjectSchema({
       description: "Date modified",
       fromKey: "date_modified",
     },
-    url: {
+    contactTypeId: {
       type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Url,
-      description: "View Comapny on Copper",
+      description: "Contact type ID on Copper",
+      fromKey: "contact_type_id",
+    },
+    assigneeId: {
+      type: coda.ValueType.String,
+      description: "Assignee ID on Copper",
+      fromKey: "assignee_id",
+    },
+    companyId: {
+      type: coda.ValueType.String,
+      description: "Company ID on Copper",
+      required: true,
+      fromKey: "id",
     },
   },
 });
@@ -210,20 +211,66 @@ export const PersonSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "personId",
   primary: "fullName",
-  featured: ["company", "assignee", "url"],
+  featured: ["title", "company", "assignee", "copperUrl"],
   identity: { name: "Person" },
   properties: {
-    personId: {
-      type: coda.ValueType.String,
-      description: "Person ID on Copper",
-      required: true,
-      fromKey: "id",
-    },
     fullName: {
       type: coda.ValueType.String,
       description: "Person name",
       required: true,
       fromKey: "name",
+    },
+    title: {
+      type: coda.ValueType.String,
+      description: "Title",
+    },
+    company: CompanyReferenceSchema,
+    assignee: CopperUserSchema,
+    copperUrl: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "View Person on Copper",
+      fromKey: "url",
+    },
+    tags: {
+      type: coda.ValueType.Array,
+      description: "Tags",
+      items: coda.makeSchema({
+        type: coda.ValueType.String,
+      }),
+    },
+    contactType: {
+      type: coda.ValueType.String,
+      description: "Type of contact",
+    },
+    fullAddress: {
+      // synthetic address property (combining all address fields)
+      type: coda.ValueType.String,
+      description: "Full address",
+    },
+    details: {
+      type: coda.ValueType.String,
+      description: "Details",
+    },
+    emails: {
+      type: coda.ValueType.Array,
+      description: "Email addresses",
+      items: EmailAddressSchema,
+    },
+    phoneNumbers: {
+      type: coda.ValueType.Array,
+      description: "Phone numbers",
+      items: PhoneNumberSchema,
+    },
+    socials: {
+      type: coda.ValueType.Array,
+      description: "Social media links",
+      items: SocialSchema,
+    },
+    websites: {
+      type: coda.ValueType.Array,
+      description: "Websites",
+      items: WebsiteSchema,
     },
     prefix: {
       type: coda.ValueType.String,
@@ -248,15 +295,6 @@ export const PersonSchema = coda.makeObjectSchema({
       type: coda.ValueType.String,
       description: "Name suffix",
     },
-    title: {
-      type: coda.ValueType.String,
-      description: "Title",
-    },
-    fullAddress: {
-      // synthetic address property (combining all address fields)
-      type: coda.ValueType.String,
-      description: "Full address",
-    },
     street: {
       type: coda.ValueType.String,
       description: "Address: street",
@@ -282,43 +320,6 @@ export const PersonSchema = coda.makeObjectSchema({
       description: "Address: country",
       fromKey: "address.country",
     },
-    company: CompanyReferenceSchema,
-    assignee: CopperUserSchema,
-    contactType: {
-      type: coda.ValueType.String,
-      description: "Type of contact",
-    },
-    details: {
-      type: coda.ValueType.String,
-      description: "Details",
-    },
-    emails: {
-      type: coda.ValueType.Array,
-      description: "Email addresses",
-      items: EmailAddressSchema,
-    },
-    phoneNumbers: {
-      type: coda.ValueType.Array,
-      description: "Phone numbers",
-      items: PhoneNumberSchema,
-    },
-    socials: {
-      type: coda.ValueType.Array,
-      description: "Social media links",
-      items: SocialSchema,
-    },
-    tags: {
-      type: coda.ValueType.Array,
-      description: "Tags",
-      items: coda.makeSchema({
-        type: coda.ValueType.String,
-      }),
-    },
-    websites: {
-      type: coda.ValueType.Array,
-      description: "Websites",
-      items: WebsiteSchema,
-    },
     interactionCount: {
       type: coda.ValueType.Number,
       description: "Number of interactions with this person",
@@ -336,10 +337,11 @@ export const PersonSchema = coda.makeObjectSchema({
       description: "Date modified",
       fromKey: "date_modified",
     },
-    url: {
+    personId: {
       type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Url,
-      description: "View Person on Copper",
+      description: "Person ID on Copper",
+      required: true,
+      fromKey: "id",
     },
   },
 });
@@ -351,25 +353,31 @@ export const OpportunitySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "opportunityId",
   primary: "opportunityName",
-  featured: ["company", "status", "monetaryValue", "closeDate", "url"],
+  featured: [
+    "company",
+    "primaryContact",
+    "status",
+    "monetaryValue",
+    "copperUrl",
+  ],
   identity: { name: "Opportunity" },
   properties: {
-    opportunityId: {
-      type: coda.ValueType.String,
-      description: "Copper ID of the opportunity",
-      required: true,
-      fromKey: "id",
-    },
     opportunityName: {
       type: coda.ValueType.String,
       description: "Name of the opportunity",
       fromKey: "name",
     },
-    assigneeId: {
+    primaryContact: PersonReferenceSchema,
+    company: CompanyReferenceSchema,
+    status: {
       type: coda.ValueType.String,
-      fromKey: "assignee_id",
+      description: "Status of the opportunity",
     },
     assignee: CopperUserSchema,
+    pipelineStage: {
+      type: coda.ValueType.String,
+      description: "Stage of the pipeline that the opportunity is in",
+    },
     closeDate: {
       // for some reason this is a MM/DD/YYYY or DD/MM/YYYY string, while others are unix epoch
       type: coda.ValueType.String,
@@ -377,16 +385,28 @@ export const OpportunitySchema = coda.makeObjectSchema({
       description: "Close date of the opportunity",
       fromKey: "close_date",
     },
-    company: CompanyReferenceSchema,
-    companyId: {
-      type: coda.ValueType.String,
-      description: "Id of the related company",
-      fromKey: "company_id",
+    monetaryValue: {
+      type: coda.ValueType.Number,
+      codaType: coda.ValueHintType.Currency,
+      description: "Expected value of the opportunity",
+      fromKey: "monetary_value",
     },
-    companyName: {
+    copperUrl: {
       type: coda.ValueType.String,
-      description: "Name of the related company",
-      fromKey: "company_name",
+      codaType: coda.ValueHintType.Url,
+      description: "View Opportunity on Copper",
+      fromKey: "url",
+    },
+    priority: {
+      type: coda.ValueType.String,
+      description: "Priority of the opportunity (None, Low, Medium, High)",
+    },
+    tags: {
+      type: coda.ValueType.Array,
+      items: coda.makeSchema({
+        type: coda.ValueType.String,
+      }),
+      description: "Opportunity tags",
     },
     customerSource: {
       type: coda.ValueType.String,
@@ -404,41 +424,10 @@ export const OpportunitySchema = coda.makeObjectSchema({
       type: coda.ValueType.String,
       description: "The pipeline the opportunity belongs to",
     },
-    pipelineStage: {
-      type: coda.ValueType.String,
-      description: "Stage of the pipeline that the opportunity is in",
-    },
-    primaryContactId: {
-      type: coda.ValueType.String,
-      description: "Primary customer contact ID",
-      fromKey: "primary_contact_id",
-    },
-    primaryContact: PersonReferenceSchema,
-    status: {
-      type: coda.ValueType.String,
-      description: "Status of the opportunity",
-    },
-    priority: {
-      type: coda.ValueType.String,
-      description: "Priority of the opportunity (None, Low, Medium, High)",
-    },
-    tags: {
-      type: coda.ValueType.Array,
-      items: coda.makeSchema({
-        type: coda.ValueType.String,
-      }),
-      description: "Opportunity tags",
-    },
     interactionCount: {
       type: coda.ValueType.Number,
       description: "Number of interactions related to this opportunity",
       fromKey: "interaction_count",
-    },
-    monetaryValue: {
-      type: coda.ValueType.Number,
-      codaType: coda.ValueHintType.Currency,
-      description: "Expected value of the opportunity",
-      fromKey: "monetary_value",
     },
     winProbability: {
       type: coda.ValueType.Number,
@@ -476,10 +465,30 @@ export const OpportunitySchema = coda.makeObjectSchema({
       description: "Date the opportunity was last modified on",
       fromKey: "date_modified",
     },
-    url: {
+    primaryContactId: {
       type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Url,
-      description: "View Opportunity on Copper",
+      description: "Primary customer contact ID",
+      fromKey: "primary_contact_id",
+    },
+    assigneeId: {
+      type: coda.ValueType.String,
+      fromKey: "assignee_id",
+    },
+    companyId: {
+      type: coda.ValueType.String,
+      description: "Id of the related company",
+      fromKey: "company_id",
+    },
+    companyName: {
+      type: coda.ValueType.String,
+      description: "Name of the related company",
+      fromKey: "company_name",
+    },
+    opportunityId: {
+      type: coda.ValueType.String,
+      description: "Copper ID of the opportunity",
+      required: true,
+      fromKey: "id",
     },
   },
 });
