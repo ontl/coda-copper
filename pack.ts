@@ -19,7 +19,7 @@ pack.setUserAuthentication({
     },
   ],
   instructionsUrl:
-    "https://developer.copper.com/introduction/authentication.html",
+    "https://coda.io/@nickhe/copper-pack-for-coda/getting-started-2",
 });
 
 /* -------------------------------------------------------------------------- */
