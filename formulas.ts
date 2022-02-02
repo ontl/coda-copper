@@ -60,7 +60,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = {};
-  if ((opportunities.length = constants.PAGE_SIZE))
+  if (opportunities.length == constants.PAGE_SIZE)
     nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
@@ -107,7 +107,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = undefined;
-  if ((companies.length = constants.PAGE_SIZE))
+  if (companies.length == constants.PAGE_SIZE)
     nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
@@ -155,7 +155,7 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
   let nextContinuation = undefined;
-  if ((people.length = constants.PAGE_SIZE))
+  if (people.length == constants.PAGE_SIZE)
     nextContinuation = { pageNumber: pageNumber + 1 };
 
   return {
