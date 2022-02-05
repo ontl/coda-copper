@@ -111,6 +111,17 @@ function getCopperUrl(
   return `https://app.copper.com/companies/${copperAccountId}/app#/${entityType}/${entityId}`;
 }
 
+export function getRecordApiEndpoint(
+  recordType: "person" | "company" | "opportunity",
+  id: string
+) {
+  return (
+    constants.RECORD_TYPES.find((type) => type.primary === recordType).plural +
+    "/" +
+    id
+  );
+}
+
 /**
  * Extracts a Copper record ID from a Copper URL (or just returns the ID if ID is supplied)
  * @param idOrUrl user-supplied record ID or Copper URL for a record
@@ -428,4 +439,23 @@ export async function enrichOpportunityResponseWithFetches(
   );
 
   return enrichedOpportunity;
+}
+
+export async function enrichResponseWithFetches(
+  context: coda.ExecutionContext,
+  recordType: "person" | "company" | "opportunity",
+  response:
+    | types.OpportunityApiResponse
+    | types.PersonApiResponse
+    | types.CompanyApiResponse
+) {
+  if (recordType == "person") {
+    return await enrichPersonResponseWithFetches(context, response);
+  } else if (recordType == "company") {
+    return await enrichCompanyResponseWithFetches(context, response);
+  } else if (recordType == "opportunity") {
+    return await enrichOpportunityResponseWithFetches(context, response);
+  } else {
+    throw new coda.UserVisibleError(`Unknown record type: ${recordType}`);
+  }
 }

@@ -370,38 +370,49 @@ export async function assignRecord(
     assignee_id: assigneeUser.id,
   };
   // Prepare the URL
-  let url =
-    constants.RECORD_TYPES.find((type) => type.primary === recordType).plural +
-    "/" +
-    recordId.id;
+  let endpoint = helpers.getRecordApiEndpoint(recordType, recordId.id);
   // Update the record (the API will respond with the updated record, so
   // we'll hang onto that too)
-  let response = await helpers.callApi(context, url, "PUT", payload);
+  let response = await helpers.callApi(context, endpoint, "PUT", payload);
+  // Enrich the updated record and prepare it for insertion back into the sync table
+  return await helpers.enrichResponseWithFetches(
+    context,
+    recordType,
+    response.body
+  );
+}
 
-  let updatedRecord: any;
-  switch (recordType) {
-    case "opportunity":
-      updatedRecord = await helpers.enrichOpportunityResponseWithFetches(
-        context,
-        response.body
-      );
-      break;
-    case "person":
-      updatedRecord = await helpers.enrichPersonResponseWithFetches(
-        context,
-        response.body
-      );
-      break;
-    case "company":
-      updatedRecord = await helpers.enrichCompanyResponseWithFetches(
-        context,
-        response.body
-      );
-      break;
+export async function addOrRemoveTag(
+  context: coda.ExecutionContext,
+  recordType: "opportunity" | "person" | "company",
+  urlOrId: string,
+  tag: string,
+  remove = false // if true, remove the tag instead of adding it
+) {
+  const recordId = helpers.getIdFromUrlOrId(urlOrId);
+  helpers.checkRecordIdType(recordId.type, recordType);
+
+  let endpoint = helpers.getRecordApiEndpoint(recordType, recordId.id);
+
+  let existingResponse = await helpers.callApi(context, endpoint, "GET");
+  let tags: string[] = existingResponse.body.tags;
+
+  if (remove) {
+    tags = tags.filter((candidateTag) => candidateTag !== tag);
+  } else {
+    tags.push(tag);
   }
 
-  return updatedRecord;
+  let response = await helpers.callApi(context, endpoint, "PUT", {
+    tags: tags,
+  });
+  return await helpers.enrichResponseWithFetches(
+    context,
+    recordType,
+    response.body
+  );
 }
+
 /* -------------------------------------------------------------------------- */
 /*                                Autocomplete                                */
 /* -------------------------------------------------------------------------- */
