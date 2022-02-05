@@ -100,7 +100,7 @@ pack.addSyncTable({
 pack.addFormula({
   name: "Opportunity",
   description:
-    "Gets all the details of a Copper Opportunity, based on its by URL or ID",
+    "Gets all the details of a Copper Opportunity, based on its URL or ID",
   parameters: [
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -118,7 +118,7 @@ pack.addFormula({
 pack.addFormula({
   name: "Company",
   description:
-    "Gets all the details of a Copper Company, based on its by URL or ID",
+    "Gets all the details of a Copper Company, based on its URL or ID",
   parameters: [
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -136,7 +136,7 @@ pack.addFormula({
 pack.addFormula({
   name: "Person",
   description:
-    "Gets all the details of a Copper Person (contact), based on its by URL or ID",
+    "Gets all the details of a Copper Person (contact), based on its URL or ID",
   parameters: [
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -307,7 +307,7 @@ pack.addFormula({
 /* --------------------------------- Add Tag -------------------------------- */
 
 pack.addFormula({
-  name: "AddTagToOpportunity",
+  name: "TagOpportunity",
   description: "Add a tag to a Copper Opportunity",
   parameters: [
     coda.makeParameter({
@@ -330,30 +330,7 @@ pack.addFormula({
 });
 
 pack.addFormula({
-  name: "AddTagToCompany",
-  description: "Add a tag to a Copper Company",
-  parameters: [
-    coda.makeParameter({
-      type: coda.ParameterType.String,
-      name: "urlOrId",
-      description: "The URL or ID of the company",
-    }),
-    coda.makeParameter({
-      type: coda.ParameterType.String,
-      name: "tag",
-      description: "The tag to apply to the company",
-    }),
-  ],
-  resultType: coda.ValueType.Object,
-  schema: schemas.CompanySchema,
-  isAction: true,
-  execute: async function ([urlOrId, tag], context) {
-    return formulas.addOrRemoveTag(context, "company", urlOrId, tag);
-  },
-});
-
-pack.addFormula({
-  name: "AddTagToPerson",
+  name: "TagPerson",
   description: "Add a tag to a Copper Person",
   parameters: [
     coda.makeParameter({
@@ -375,10 +352,33 @@ pack.addFormula({
   },
 });
 
+pack.addFormula({
+  name: "TagCompany",
+  description: "Add a tag to a Copper Company",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the company",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tag",
+      description: "The tag to apply to the company",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.CompanySchema,
+  isAction: true,
+  execute: async function ([urlOrId, tag], context) {
+    return formulas.addOrRemoveTag(context, "company", urlOrId, tag);
+  },
+});
+
 /* ------------------------------- Remove Tag ------------------------------- */
 
 pack.addFormula({
-  name: "RemoveTagFromOpportunity",
+  name: "UntagOpportunity",
   description: "Remove a tag from a Copper Opportunity",
   parameters: [
     coda.makeParameter({
@@ -401,30 +401,7 @@ pack.addFormula({
 });
 
 pack.addFormula({
-  name: "RemoveTagFromCompany",
-  description: "Remove a tag from a Copper Company",
-  parameters: [
-    coda.makeParameter({
-      type: coda.ParameterType.String,
-      name: "urlOrId",
-      description: "The URL or ID of the company",
-    }),
-    coda.makeParameter({
-      type: coda.ParameterType.String,
-      name: "tag",
-      description: "The tag to remove from the company",
-    }),
-  ],
-  resultType: coda.ValueType.Object,
-  schema: schemas.CompanySchema,
-  isAction: true,
-  execute: async function ([urlOrId, tag], context) {
-    return formulas.addOrRemoveTag(context, "company", urlOrId, tag, true);
-  },
-});
-
-pack.addFormula({
-  name: "RemoveTagFromPerson",
+  name: "UntagPerson",
   description: "Remove a tag from a Copper Person",
   parameters: [
     coda.makeParameter({
@@ -443,5 +420,28 @@ pack.addFormula({
   isAction: true,
   execute: async function ([urlOrId, tag], context) {
     return formulas.addOrRemoveTag(context, "person", urlOrId, tag, true);
+  },
+});
+
+pack.addFormula({
+  name: "UntagCompany",
+  description: "Remove a tag from a Copper Company",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the company",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "tag",
+      description: "The tag to remove from the company",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.CompanySchema,
+  isAction: true,
+  execute: async function ([urlOrId, tag], context) {
+    return formulas.addOrRemoveTag(context, "company", urlOrId, tag, true);
   },
 });
