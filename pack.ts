@@ -221,6 +221,32 @@ pack.addFormula({
   },
 });
 
+pack.addFormula({
+  name: "UpdateOpportunityStage",
+  description: "Changes the stage of a Copper Opportunity",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the opportunity",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "stage",
+      description: "The stage to move the opportunity to",
+      autocomplete: async function (context, search, parameters) {
+        return formulas.getPipelineStages(context, parameters.urlOrId);
+      },
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+  isAction: true,
+  execute: async function ([urlOrId, stage], context) {
+    return formulas.updateOpportunityStage(context, urlOrId, stage);
+  },
+});
+
 /* --------------------------------- Assign --------------------------------- */
 // Shouldn't we have a single Assign() formula, that can accept URLs of any
 // record type? That would be marvellous, but we have to speficy ahead of time

@@ -343,6 +343,50 @@ export async function updateOpportunityStatus(
   return opportunity;
 }
 
+export async function updateOpportunityStage(
+  context: coda.ExecutionContext,
+  urlOrId: string,
+  newStageName: string
+) {
+  const opportunityId = helpers.getIdFromUrlOrId(urlOrId);
+  helpers.checkRecordIdType(opportunityId.type, "opportunity");
+
+  // Get opportunity details and pipelines (which include stage lists)
+  let [existingResponse, pipelines] = await Promise.all([
+    helpers.callApi(context, "opportunities/" + opportunityId.id, "GET"),
+    helpers.callApiBasicCached(context, "pipelines"),
+  ]);
+  let opportunity = existingResponse.body;
+
+  // Grab the pipeline associated with the opportunity
+  let pipeline = pipelines.find(
+    (pipeline) => pipeline.id === (opportunity.pipeline_id as string)
+  );
+
+  // Grab the stage that matches the requested stage name
+  let newStage = pipeline.stages.find(
+    (stage) => stage.name.toLowerCase() === newStageName.toLowerCase()
+  );
+  if (!newStage) {
+    throw new coda.UserVisibleError(
+      "Stage must be " +
+        helpers.humanReadableList(pipeline.stages.map(({ name }) => name))
+    );
+  }
+
+  // Update the stage
+  let response = await helpers.callApi(
+    context,
+    "opportunities/" + opportunityId.id,
+    "PUT",
+    { pipeline_stage_id: newStage.id }
+  );
+  return await helpers.enrichOpportunityResponseWithFetches(
+    context,
+    response.body
+  );
+}
+
 export async function assignRecord(
   context: coda.ExecutionContext,
   recordType: "opportunity" | "person" | "company",
@@ -425,4 +469,24 @@ export async function getLossReasons(context: coda.ExecutionContext) {
 export async function getUsers(context: coda.ExecutionContext) {
   let response = await helpers.getCopperUsers(context);
   return response.map((user) => user.email);
+}
+
+export async function getPipelineStages(
+  context: coda.ExecutionContext,
+  urlOrId: string
+) {
+  const opportunityId = helpers.getIdFromUrlOrId(urlOrId);
+  helpers.checkRecordIdType(opportunityId.type, "opportunity");
+  let endpoint = helpers.getRecordApiEndpoint("opportunity", opportunityId.id);
+  let [existingResponse, pipelines] = await Promise.all([
+    helpers.callApi(context, endpoint, "GET"),
+    helpers.callApiBasicCached(context, "pipelines"),
+  ]);
+  let opportunity = existingResponse.body;
+  return pipelines
+    .find(
+      (pipeline) =>
+        (pipeline.id as string) === (opportunity.pipeline_id as string)
+    )
+    .stages.map((stage) => stage.name);
 }
