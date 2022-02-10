@@ -375,6 +375,9 @@ export async function renameOpportunity(
   urlOrId: string,
   newName: string
 ) {
+  if (!newName)
+    throw new coda.UserVisibleError("New opportunity name cannot be blank");
+
   const opportunityId = helpers.getIdFromUrlOrId(urlOrId);
   helpers.checkRecordIdType(opportunityId.type, "opportunity");
 
