@@ -68,9 +68,10 @@ export async function callApiBasicCached(
 
 /**
  * Gets users in the Copper organization, for mapping to assignees/owners of records
- * @returns array of Copper users (objects with id, name, email)
  */
-export async function getCopperUsers(context: coda.ExecutionContext) {
+export async function getCopperUsers(
+  context: coda.ExecutionContext
+): Promise<types.CopperUserApiResponse[]> {
   let response = await callApi(
     context,
     "users/search",
@@ -83,10 +84,9 @@ export async function getCopperUsers(context: coda.ExecutionContext) {
 }
 
 /**
- * Contatenates the components of a Copper physical address into a single string
- * @param address object with street, city, state, country, postal_code like what Copper returns
+ * Concatenates the components of a Copper physical address into a single string
  */
-function concatenateAddress(address: types.AddressApiProperty) {
+function concatenateAddress(address: types.AddressApiProperty): string {
   let concatenatedAddress: string = "";
   if (address?.street) concatenatedAddress += address.street + ", ";
   if (address?.city) concatenatedAddress += address.city + ", ";
@@ -97,9 +97,9 @@ function concatenateAddress(address: types.AddressApiProperty) {
 }
 
 /**
- * Generates human-ready URLs for Copper entities
+ * Generates web URLs for Copper entities (for their UI pages, not API endpoints)
  * @param copperAccountId pulled once and then provided each time (TODO: consider refactoring to fetch (cached) with each execution)
- * @param entityType using Copper's URL naming (company = "organization", opportunity = "deal", person = "contact")
+ * @param entityType using Copper's URL naming (opportunity = "deal", etc. TODO: use constants.RECORD_TYPES)
  * @param entityId
  * @returns URL of the entity
  */
@@ -124,10 +124,11 @@ export function getRecordApiEndpoint(
 
 /**
  * Extracts a Copper record ID from a Copper URL (or just returns the ID if ID is supplied)
- * @param idOrUrl user-supplied record ID or Copper URL for a record
- * @returns { id, type }
  */
-export function getIdFromUrlOrId(idOrUrl: string) {
+export function getIdFromUrlOrId(idOrUrl: string): {
+  id: string;
+  type: string;
+} {
   const copperIdRegex = new RegExp("^[0-9]{5,}$"); // just a number, with 5 or more digits
   // If it already looks like an ID, just return it
   if (copperIdRegex.test(idOrUrl)) return { id: idOrUrl, type: null };
@@ -136,8 +137,8 @@ export function getIdFromUrlOrId(idOrUrl: string) {
   if (constants.copperRecordUrlRegex.test(idOrUrl)) {
     let matches = constants.copperRecordUrlRegex.exec(idOrUrl);
     if (matches) {
-      // The type is the second capture group, accessible via [1]. convert it from the
-      // nomenclature used in Copper's URLs to the nomenclature used everywhere else (the 'primary')
+      // The type is the second capture group, accessible via [1]. Convert it from the nomenclature
+      // used in Copper's URLs to the nomenclature used everywhere else (the 'primary')
       let recordType = constants.RECORD_TYPES.find(
         (type) => type.webUrl === matches[1]
       ).primary;
@@ -169,12 +170,12 @@ export function checkRecordIdType(recordType: string, expectedType: string) {
  */
 function prepareCustomFieldsOnRecord(
   customFieldDefinitions: types.CustomFieldDefinitionApiResponse[],
-  customFieldsOnRecord
+  customFieldsOnRecord: types.CustomFieldApiProperty[]
 ) {
   let preparedFields: { [key: string]: any } = {};
-  // Loop over all of the custom field properties that came in from the API
-  // on the person record, get the field names and values, and get them ready
-  // to be added as properties that fit the schema for the sync table or object
+  // Loop over all of the custom field properties that came in from the API on the
+  // person/company/opportunity record, get the field names and values, and get them
+  // ready to be added as properties that fit the schema for the sync table or object
   for (let customFieldEntry of customFieldsOnRecord) {
     let fieldName = customFieldDefinitions.find(
       (customField) =>
@@ -185,18 +186,29 @@ function prepareCustomFieldsOnRecord(
   return preparedFields;
 }
 
-function addIndefiniteArticle(word: string) {
-  // Add "a" or "an" to the beginning of a word because UX
+/**
+ * Adds "a" or "an" to the beginning of a word because UX
+ */
+function addIndefiniteArticle(word: string): string {
   let vowels = "aeiou";
   let article = vowels.includes(word[0]) ? "an" : "a";
   return article + " " + word;
 }
 
-export function titleCase(string: string) {
+/**
+ * Capitalizes the first letter of a string
+ */
+export function initialCapital(string: string): string {
   return string[0].toUpperCase() + string.slice(1).toLowerCase();
 }
 
-export function humanReadableList(list: string[], conjunction: string = "or") {
+/**
+ * Generates a list of items separated by commas and "and" or "or"
+ */
+export function humanReadableList(
+  list: string[],
+  conjunction: string = "or"
+): string {
   if (list.length === 1) return list[0];
   if (list.length === 2) return list.join(" " + conjunction + " ");
   return (
@@ -212,74 +224,6 @@ export function humanReadableList(list: string[], conjunction: string = "or") {
 // the API (for the main record and also its supporting data), and use the
 // supporting data to enrich the main record.
 
-export function enrichPersonResponse(
-  person: any,
-  copperAccountId: string,
-  users: types.CopperUserApiResponse[],
-  contactTypes: types.BasicApiResponse[],
-  customFieldDefinitions: types.CustomFieldDefinitionApiResponse[]
-) {
-  person.fullAddress = concatenateAddress(person.address);
-  person.url = getCopperUrl(copperAccountId, "contact", person.id);
-  // prepare reference to companies table
-  if (person.company_id) {
-    person.company = {
-      id: person.company_id,
-      name: person.company_name,
-    };
-  }
-  if (users) {
-    // Prepare reference to Coda Person object (Coda will try to match this
-    // to a Coda user based on email). First, find the matching user.
-    let assignee = users.find((user) => user.id == person.assignee_id);
-    person.assignee = {
-      copperUserId: person.assignee_id,
-      email: assignee?.email,
-      name: assignee?.name,
-    };
-  }
-  if (contactTypes) {
-    // Match contact type and get string representation
-    person.contactType = contactTypes.find(
-      (contactType) => contactType.id == person.contact_type_id
-    )?.name;
-  }
-  if (customFieldDefinitions && person.custom_fields)
-    person = Object.assign(
-      person,
-      prepareCustomFieldsOnRecord(customFieldDefinitions, person.custom_fields)
-    );
-
-  return person;
-}
-
-export function enrichCompanyResponse(
-  company: any,
-  copperAccountId: string,
-  users: types.CopperUserApiResponse[],
-  customFieldDefinitions: types.CustomFieldDefinitionApiResponse[]
-) {
-  company.url = getCopperUrl(copperAccountId, "organization", company.id);
-  company.fullAddress = concatenateAddress(company.address);
-  if (users) {
-    // Prepare reference to Coda Person object (Coda will try to match this
-    // to a Coda user based on email). First, find the matching user.
-    let assignee = users.find((user) => user.id == company.assignee_id);
-    company.assignee = {
-      copperUserId: company.assignee_id,
-      email: assignee?.email,
-      name: assignee?.name,
-    };
-  }
-  if (customFieldDefinitions && company.custom_fields)
-    company = Object.assign(
-      company,
-      prepareCustomFieldsOnRecord(customFieldDefinitions, company.custom_fields)
-    );
-
-  return company;
-}
-
 export function enrichOpportunityResponse(
   opportunity: any,
   copperAccountId: string,
@@ -287,7 +231,7 @@ export function enrichOpportunityResponse(
   pipelines: types.PipelineApiResponse[],
   customerSources: types.BasicApiResponse[],
   lossReasons: types.BasicApiResponse[],
-  customFieldDefinitions: types.CustomFieldDefinitionApiResponse[],
+  customFieldDefinitions?: types.CustomFieldDefinitionApiResponse[],
   // references to other tables only work in sync tables; don't add them for column formats
   withReferences: boolean = false
 ) {
@@ -348,13 +292,84 @@ export function enrichOpportunityResponse(
   return opportunity;
 }
 
+export function enrichPersonResponse(
+  person: any,
+  copperAccountId: string,
+  users: types.CopperUserApiResponse[],
+  contactTypes: types.BasicApiResponse[],
+  customFieldDefinitions?: types.CustomFieldDefinitionApiResponse[]
+) {
+  person.fullAddress = concatenateAddress(person.address);
+  person.url = getCopperUrl(copperAccountId, "contact", person.id);
+  // Prepare reference to companies sync table
+  if (person.company_id) {
+    person.company = {
+      id: person.company_id,
+      name: person.company_name,
+    };
+  }
+  if (users) {
+    // Prepare reference to Coda Person object (Coda will try to match this
+    // to a Coda user based on email). First, find the matching user.
+    let assignee = users.find((user) => user.id == person.assignee_id);
+    person.assignee = {
+      copperUserId: person.assignee_id,
+      email: assignee?.email,
+      name: assignee?.name,
+    };
+  }
+  if (contactTypes) {
+    // Match contact type and get string representation
+    person.contactType = contactTypes.find(
+      (contactType) => contactType.id == person.contact_type_id
+    )?.name;
+  }
+  if (customFieldDefinitions && person.custom_fields)
+    // Merge in any custom fields
+    person = Object.assign(
+      person,
+      prepareCustomFieldsOnRecord(customFieldDefinitions, person.custom_fields)
+    );
+
+  return person;
+}
+
+export function enrichCompanyResponse(
+  company: any,
+  copperAccountId: string,
+  users: types.CopperUserApiResponse[],
+  customFieldDefinitions?: types.CustomFieldDefinitionApiResponse[]
+) {
+  company.url = getCopperUrl(copperAccountId, "organization", company.id);
+  company.fullAddress = concatenateAddress(company.address);
+  if (users) {
+    // Prepare reference to Coda Person object (Coda will try to match this
+    // to a Coda user based on email). First, find the matching user.
+    let assignee = users.find((user) => user.id == company.assignee_id);
+    company.assignee = {
+      copperUserId: company.assignee_id,
+      email: assignee?.email,
+      name: assignee?.name,
+    };
+  }
+  if (customFieldDefinitions && company.custom_fields)
+    company = Object.assign(
+      company,
+      prepareCustomFieldsOnRecord(customFieldDefinitions, company.custom_fields)
+    );
+
+  return company;
+}
+
 // FETCH VERSIONS: Enrich from just a record API response, by fetching the supporting data
 
 // Why not use these fetch methods all the time? Because in the case of sync
 // tables, we just want to fetch this info once and re-use it across all records,
 // without hitting the endpoints again each time. Coda's built-in caching would
-// usually help with this problem, but since some of the endpoints we need to hit
-// are POST (e.g. getCopperUsers()), we can't rely on the built-in caching.
+// usually help with this problem (automatically avoiding repeated API hits, even
+// if we ask for them), but since some of the endpoints we need to hit are POST
+// (e.g. getCopperUsers()), we can't rely on the built-in caching as it only
+// supports GET.
 
 export async function enrichPersonResponseWithFetches(
   context: coda.ExecutionContext,
@@ -365,20 +380,17 @@ export async function enrichPersonResponseWithFetches(
     users, // Copper users who might be "assignees"
     copperAccount, // for building Copper URLs
     contactTypes,
-    customFieldDefinitions,
   ] = await Promise.all([
     getCopperUsers(context),
     callApiBasicCached(context, "account"),
     callApiBasicCached(context, "contact_types"),
-    callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let enrichedPerson = await enrichPersonResponse(
     person,
     copperAccount.id,
     users,
-    contactTypes,
-    customFieldDefinitions
+    contactTypes
   );
 
   return enrichedPerson;
@@ -389,17 +401,15 @@ export async function enrichCompanyResponseWithFetches(
   company: types.CompanyApiResponse
 ) {
   // Fetch the enrichment data we'll need
-  const [users, copperAccount, customFieldDefinitions] = await Promise.all([
+  const [users, copperAccount] = await Promise.all([
     getCopperUsers(context),
     callApiBasicCached(context, "account"),
-    callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let enrichedCompany = await enrichCompanyResponse(
     company,
     copperAccount.id,
-    users,
-    customFieldDefinitions
+    users
   );
 
   return enrichedCompany;
@@ -410,23 +420,14 @@ export async function enrichOpportunityResponseWithFetches(
   opportunity: types.OpportunityApiResponse
 ) {
   // Fetch the enrichment data we'll need
-  const [
-    users,
-    pipelines,
-    customerSources,
-    lossReasons,
-    copperAccount,
-    customFieldDefinitions,
-  ] = await Promise.all([
-    getCopperUsers(context),
-    callApiBasicCached(context, "pipelines"),
-    callApiBasicCached(context, "customer_sources"),
-    callApiBasicCached(context, "loss_reasons"),
-    callApiBasicCached(context, "account"),
-    callApiBasicCached(context, "custom_field_definitions"),
-  ]);
-
-  console.log("Custom field defs", customFieldDefinitions);
+  const [users, pipelines, customerSources, lossReasons, copperAccount] =
+    await Promise.all([
+      getCopperUsers(context),
+      callApiBasicCached(context, "pipelines"),
+      callApiBasicCached(context, "customer_sources"),
+      callApiBasicCached(context, "loss_reasons"),
+      callApiBasicCached(context, "account"),
+    ]);
 
   let enrichedOpportunity = await enrichOpportunityResponse(
     opportunity,
@@ -434,8 +435,7 @@ export async function enrichOpportunityResponseWithFetches(
     users,
     pipelines,
     customerSources,
-    lossReasons,
-    customFieldDefinitions
+    lossReasons
   );
 
   return enrichedOpportunity;

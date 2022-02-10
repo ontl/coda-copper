@@ -4,10 +4,11 @@
 
 // Individual properties that appear within API responses
 export interface CustomFieldApiProperty {
-  // The version of custom fields that appear in another record, such as an
+  // The version of custom fields that appear on a record, such as an
   // opportunity, person, or company.
-  custom_field_definition_id: number;
-  value: string | number;
+  custom_field_definition_id: string;
+  value: string | number | boolean;
+  computed_value: string | number | boolean;
 }
 
 export interface AddressApiProperty {

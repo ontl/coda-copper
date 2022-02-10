@@ -6,9 +6,6 @@ import * as helpers from "./helpers";
 /* -------------------------------------------------------------------------- */
 /*                            Sync Table Functions                            */
 /* -------------------------------------------------------------------------- */
-/**
- * Syncs opportunities from Copper
- */
 
 export async function syncOpportunities(context: coda.SyncExecutionContext) {
   // If there is a previous continuation, grab its page number. Otherwise,
@@ -21,7 +18,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
   const [
     response, // page of results from Copper API
     users, // Copper users who might be "assignees"
-    copperAccount, // for building Copper URLs
+    copperAccount, // account ID, for building Copper URLs
     pipelines,
     customerSources,
     lossReasons,
@@ -32,6 +29,8 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
       page_number: pageNumber,
       sort_by: "date_created",
       sort_direction: "desc",
+      // A feature of the Copper API that makes it simpler to manage certain custom
+      // field types like select list.
       custom_field_computed_values: true,
     }),
     helpers.getCopperUsers(context),
@@ -68,9 +67,6 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
     continuation: nextContinuation,
   };
 }
-/**
- * Syncs companies from Copper
- */
 
 export async function syncCompanies(context: coda.SyncExecutionContext) {
   // If there is a previous continuation, grab its page number. Otherwise,
@@ -79,7 +75,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
     (context.sync.continuation?.pageNumber as number) || 1;
 
   // Get a page of results, the Copper account info we'll need for building URLs,
-  // and the list of users who might be "assignees"
+  // the list of users who might be "assignees", and any custom fields
   const [response, copperAccount, users, customFieldDefinitions] =
     await Promise.all([
       helpers.callApi(context, "companies/search", "POST", {
@@ -115,9 +111,6 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
     continuation: nextContinuation,
   };
 }
-/**
- * Syncs Person records (contacts) from Copper
- */
 
 export async function syncPeople(context: coda.SyncExecutionContext) {
   // If there is a previous continuation, grab its page number. Otherwise,
@@ -187,7 +180,6 @@ export async function getOpportunity(
     pipelines,
     customerSources,
     lossReasons,
-    customFieldDefinitions,
   ] = await Promise.all([
     helpers.callApi(context, "opportunities/" + opportunityId.id, "GET", {
       custom_field_computed_values: true,
@@ -197,7 +189,6 @@ export async function getOpportunity(
     helpers.callApiBasicCached(context, "pipelines"),
     helpers.callApiBasicCached(context, "customer_sources"),
     helpers.callApiBasicCached(context, "loss_reasons"),
-    helpers.callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let opportunity = await helpers.enrichOpportunityResponse(
@@ -207,7 +198,7 @@ export async function getOpportunity(
     pipelines,
     customerSources,
     lossReasons,
-    customFieldDefinitions,
+    null, // we can't do custom fields on regular formulas, cause of static schema
     false // don't include references to Person and Company sync tables
   );
 
@@ -218,7 +209,6 @@ export async function getPerson(
   context: coda.ExecutionContext,
   urlOrId: string
 ) {
-  // Determine whether the user supplied an ID or a full URL, and extract the ID
   const opportunityId = helpers.getIdFromUrlOrId(urlOrId as string);
   helpers.checkRecordIdType(opportunityId.type, "person");
   // Get the person, as well as all the background info we'll need to enrich
@@ -228,7 +218,6 @@ export async function getPerson(
     users, // Copper users who might be "assignees"
     copperAccount, // for building Copper URLs
     contactTypes,
-    customFieldDefinitions,
   ] = await Promise.all([
     helpers.callApi(context, "people/" + opportunityId.id, "GET", {
       custom_field_computed_values: true,
@@ -236,15 +225,13 @@ export async function getPerson(
     helpers.getCopperUsers(context),
     helpers.callApiBasicCached(context, "account"),
     helpers.callApiBasicCached(context, "contact_types"),
-    helpers.callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let person = await helpers.enrichPersonResponse(
     response.body,
     copperAccount.id,
     users,
-    contactTypes,
-    customFieldDefinitions
+    contactTypes
   );
 
   return person;
@@ -263,21 +250,18 @@ export async function getCompany(
     response, // opportunity record from Copper API
     users, // Copper users who might be "assignees"
     copperAccount, // for building Copper URLs
-    customFieldDefinitions, // account-level list of custom fields
   ] = await Promise.all([
     helpers.callApi(context, "companies/" + opportunityId.id, "GET", {
       custom_field_computed_values: true,
     }),
     helpers.getCopperUsers(context),
     helpers.callApiBasicCached(context, "account"),
-    helpers.callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let company = await helpers.enrichCompanyResponse(
     response.body,
     copperAccount.id,
-    users,
-    customFieldDefinitions
+    users
   );
 
   return company;
@@ -296,8 +280,8 @@ export async function updateOpportunityStatus(
   const opportunityId = helpers.getIdFromUrlOrId(urlOrId);
   // Make sure it's the correct type of record
   helpers.checkRecordIdType(opportunityId.type, "opportunity");
-  // Make sure the status is valid
-  newStatus = helpers.titleCase(newStatus);
+  // Make sure the new status is valid
+  newStatus = helpers.initialCapital(newStatus);
   if (!constants.STATUS_OPTIONS.includes(newStatus)) {
     throw new coda.UserVisibleError(
       "New status must be " +
@@ -310,8 +294,9 @@ export async function updateOpportunityStatus(
     status: newStatus,
   };
   if (lossReason && newStatus === "Lost") {
+    // Get the list of loss reasons defined in Copper
     let lossReasons = await helpers.callApiBasicCached(context, "loss_reasons");
-    // Is the new reason in our list of loss reasons?
+    // Is the new reason in our list of loss reasons? Grab it (including its ID) if so
     let lossReasonObject = lossReasons.find(
       (reason) => reason.name === lossReason
     );
@@ -335,12 +320,10 @@ export async function updateOpportunityStatus(
     payload
   );
 
-  let opportunity = await helpers.enrichOpportunityResponseWithFetches(
+  return await helpers.enrichOpportunityResponseWithFetches(
     context,
     response.body
   );
-
-  return opportunity;
 }
 
 export async function updateOpportunityStage(
@@ -351,7 +334,7 @@ export async function updateOpportunityStage(
   const opportunityId = helpers.getIdFromUrlOrId(urlOrId);
   helpers.checkRecordIdType(opportunityId.type, "opportunity");
 
-  // Get opportunity details and pipelines (which include stage lists)
+  // Get opportunity details and pipelines (which include lists of stages in each pipeline)
   let [existingResponse, pipelines] = await Promise.all([
     helpers.callApi(context, "opportunities/" + opportunityId.id, "GET"),
     helpers.callApiBasicCached(context, "pipelines"),
@@ -387,6 +370,26 @@ export async function updateOpportunityStage(
   );
 }
 
+export async function renameOpportunity(
+  context: coda.ExecutionContext,
+  urlOrId: string,
+  newName: string
+) {
+  const opportunityId = helpers.getIdFromUrlOrId(urlOrId);
+  helpers.checkRecordIdType(opportunityId.type, "opportunity");
+
+  let response = await helpers.callApi(
+    context,
+    "opportunities/" + opportunityId.id,
+    "PUT",
+    { name: newName }
+  );
+  return await helpers.enrichOpportunityResponseWithFetches(
+    context,
+    response.body
+  );
+}
+
 export async function assignRecord(
   context: coda.ExecutionContext,
   recordType: "opportunity" | "person" | "company",
@@ -413,7 +416,7 @@ export async function assignRecord(
   let payload = {
     assignee_id: assigneeUser.id,
   };
-  // Prepare the URL
+  // Prepare the API endpoint string
   let endpoint = helpers.getRecordApiEndpoint(recordType, recordId.id);
   // Update the record (the API will respond with the updated record, so
   // we'll hang onto that too)
@@ -461,12 +464,16 @@ export async function addOrRemoveTag(
 /*                                Autocomplete                                */
 /* -------------------------------------------------------------------------- */
 
-export async function getLossReasons(context: coda.ExecutionContext) {
+export async function getLossReasons(
+  context: coda.ExecutionContext
+): Promise<string[]> {
   let response = await helpers.callApiBasicCached(context, "loss_reasons");
   return response.map((reason) => reason.name);
 }
 
-export async function getUsers(context: coda.ExecutionContext) {
+export async function getUsers(
+  context: coda.ExecutionContext
+): Promise<string[]> {
   let response = await helpers.getCopperUsers(context);
   return response.map((user) => user.email);
 }
@@ -474,7 +481,7 @@ export async function getUsers(context: coda.ExecutionContext) {
 export async function getPipelineStages(
   context: coda.ExecutionContext,
   urlOrId: string
-) {
+): Promise<string[]> {
   const opportunityId = helpers.getIdFromUrlOrId(urlOrId);
   helpers.checkRecordIdType(opportunityId.type, "opportunity");
   let endpoint = helpers.getRecordApiEndpoint("opportunity", opportunityId.id);

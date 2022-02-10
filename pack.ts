@@ -1,3 +1,9 @@
+// pack.ts is the main entry point for the pack. All the Coda-ish components are
+// defined in here, such as the pack itself, API authentication, sync tables,
+// and formulas. These then call out to schemas.ts for definitions of the shape
+// of the data the pack will be handling, and formulas.ts for more traditional
+// JavaScript methods for fetching and manipulating data.
+
 import * as coda from "@codahq/packs-sdk";
 import * as schemas from "./schemas";
 import * as constants from "./constants";
@@ -6,6 +12,11 @@ import * as formulas from "./formulas";
 export const pack = coda.newPack();
 
 pack.addNetworkDomain("copper.com");
+
+// This pack uses Custom Authentication, which is needed in cases like this where
+// an API is looking for more than just a single key or bearer token (Copper wants
+// an API key and an email). See the callApi() function in helpers.ts for more on
+// some of the quirks of using custom authentication when making fetch requests.
 pack.setUserAuthentication({
   type: coda.AuthenticationType.Custom,
   params: [
@@ -44,7 +55,7 @@ pack.addSyncTable({
     name: "SyncOpportunities",
     description: "Sync opportunities from Copper",
     cacheTtlSecs: 0, // don't cache results
-    parameters: [],
+    parameters: [], // we always want to sync all opportunities
     execute: async function ([], context) {
       return formulas.syncOpportunities(context);
     },
@@ -63,7 +74,7 @@ pack.addSyncTable({
   formula: {
     name: "SyncCompanies",
     description: "Sync companies from Copper",
-    cacheTtlSecs: 0, // don't cache results
+    cacheTtlSecs: 0,
     parameters: [],
     execute: async function ([], context) {
       return formulas.syncCompanies(context);
@@ -83,7 +94,7 @@ pack.addSyncTable({
   formula: {
     name: "SyncPeople",
     description: "Sync people from Copper",
-    cacheTtlSecs: 0, // don't cache results
+    cacheTtlSecs: 0,
     parameters: [],
     execute: async function ([], context) {
       return formulas.syncPeople(context);
@@ -109,6 +120,9 @@ pack.addFormula({
     }),
   ],
   resultType: coda.ValueType.Object,
+  // Although we use a dynamic schema in our sync tables to incorporate custom
+  // fields, dynamic schemas aren't (yet?) supported in regular formulas. So
+  // we'll just be using the static version of the schema.
   schema: schemas.OpportunitySchema,
   execute: async function ([urlOrId], context) {
     return formulas.getOpportunity(context, urlOrId);
@@ -160,6 +174,9 @@ pack.addColumnFormat({
   instructions:
     "Displays all the details of Copper Opportunities, based on their URL or Copper ID",
   formulaName: "Opportunity",
+  // Matchers automatically apply the column format if they detect a cell
+  // that looks like a Copper Opportunity URL. But users can also manually
+  // select the column format if they prefer.
   matchers: [constants.copperOpportunityUrlRegex],
 });
 
@@ -182,6 +199,8 @@ pack.addColumnFormat({
 /* -------------------------------------------------------------------------- */
 /*                                   Actions                                  */
 /* -------------------------------------------------------------------------- */
+
+/* ------------------------------ Opportunities ----------------------------- */
 
 pack.addFormula({
   name: "UpdateOpportunityStatus",
@@ -244,6 +263,29 @@ pack.addFormula({
   isAction: true,
   execute: async function ([urlOrId, stage], context) {
     return formulas.updateOpportunityStage(context, urlOrId, stage);
+  },
+});
+
+pack.addFormula({
+  name: "RenameOpportunity",
+  description: "Renames a Copper Opportunity",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the opportunity to rename",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "newName",
+      description: "The new name for the opportunity",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+  isAction: true,
+  execute: async function ([urlOrId, newName], context) {
+    return formulas.renameOpportunity(context, urlOrId, newName);
   },
 });
 
