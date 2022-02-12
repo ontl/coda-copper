@@ -463,6 +463,97 @@ export async function addOrRemoveTag(
   );
 }
 
+export async function updateCustomField(
+  context: coda.ExecutionContext,
+  recordType: "opportunity" | "person" | "company",
+  urlOrId: string,
+  fieldName: string,
+  newValue: string
+) {
+  const recordId = helpers.getIdFromUrlOrId(urlOrId);
+  helpers.checkRecordIdType(recordId.type, recordType);
+
+  // Get the existing record, as well as the list of custom fields
+  let endpoint = helpers.getRecordApiEndpoint(recordType, recordId.id);
+  let [record, allCustomFieldDefinitions] = await Promise.all([
+    helpers.callApi(context, endpoint, "GET").then((response) => response.body),
+    helpers.callApiBasicCached(context, "custom_field_definitions"),
+  ]);
+
+  // Grab just the custom fields that are relevant to this record type
+  let customFieldDefinitions = allCustomFieldDefinitions.filter((fieldDef) =>
+    fieldDef.available_on.includes(recordType)
+  );
+
+  // Get the details of the custom field we're updating
+  let targetFieldDefinition = customFieldDefinitions.find(
+    (fieldDef) =>
+      helpers.stripAndLowercase(fieldDef.name) ===
+      helpers.stripAndLowercase(fieldName)
+  );
+
+  // If we didn't find a matching field, throw an error
+  if (!targetFieldDefinition)
+    throw new coda.UserVisibleError(
+      `Couldn't find a custom field called "${fieldName}" for this record type. Try ${helpers.humanReadableList(
+        customFieldDefinitions.map(({ name }) => name)
+      )}.`
+    );
+
+  // Prepare the value in the way that Copper is expecting. For simple field types
+  // like strings, numbers or booleans, we can just pass the value straight through.
+  // But others require format conversion (e.g. dates), or an ID-based lookup
+  // (e.g. dropdown). Note that field types Connect and MultiSelect are not
+  // currently supported in the pack. See Copper API docs for full field type list:
+  // https://developer.copper.com/custom-fields/general/list-custom-field-definitions.html
+  let newPreparedValue;
+  switch (targetFieldDefinition.data_type) {
+    case "Date":
+      // Send the date in seconds since epoch (not ms as JavaScript does by default)
+      try {
+        newPreparedValue = Math.round(new Date(newValue).getTime() / 1000);
+      } catch (e) {
+        throw new coda.UserVisibleError(
+          `Couldn't parse date "${newValue}". Please use the format "YYYY-MM-DD".`
+        );
+      }
+      break;
+    case "Dropdown":
+      // Dropdowns require us to send the ID of the selected option, not its name
+      newPreparedValue = targetFieldDefinition.options.find(
+        (option) =>
+          helpers.stripAndLowercase(option.name) ===
+          helpers.stripAndLowercase(newValue)
+      )?.id;
+      if (!newPreparedValue)
+        throw new coda.UserVisibleError(
+          `${newValue} is not an option for the custom field "${fieldName}". Try ${helpers.humanReadableList(
+            targetFieldDefinition.options.map(({ name }) => name)
+          )}.`
+        );
+      break;
+    default:
+      newPreparedValue = newValue;
+  }
+
+  // Start with existing custom field values, and modify the requested one
+  let customFieldValues = record.custom_fields;
+  customFieldValues.find(
+    (field: types.CustomFieldApiProperty) =>
+      field.custom_field_definition_id === targetFieldDefinition.id
+  ).value = newPreparedValue;
+
+  // Update on the API
+  let response = await helpers.callApi(context, endpoint, "PUT", {
+    custom_fields: customFieldValues,
+  });
+  return await helpers.enrichResponseWithFetches(
+    context,
+    recordType,
+    response.body
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                Autocomplete                                */
 /* -------------------------------------------------------------------------- */

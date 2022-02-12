@@ -198,8 +198,18 @@ function addIndefiniteArticle(word: string): string {
 /**
  * Capitalizes the first letter of a string
  */
-export function initialCapital(string: string): string {
-  return string[0].toUpperCase() + string.slice(1).toLowerCase();
+export function initialCapital(stringToModify: string): string {
+  return (
+    stringToModify[0].toUpperCase() + stringToModify.slice(1).toLowerCase()
+  );
+}
+
+/**
+ * Strips all whitespace and underscores from a string and converts to
+ * lowercase (for use in comparisons)
+ */
+export function stripAndLowercase(stringToModify: string): string {
+  return stringToModify.replace(/(\s|_)/g, "").toLowerCase();
 }
 
 /**

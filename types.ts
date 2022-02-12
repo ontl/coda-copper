@@ -8,7 +8,7 @@ export interface CustomFieldApiProperty {
   // opportunity, person, or company.
   custom_field_definition_id: string;
   value: string | number | boolean;
-  computed_value: string | number | boolean;
+  computed_value?: string | number | boolean;
 }
 
 export interface AddressApiProperty {

@@ -513,3 +513,107 @@ pack.addFormula({
     return formulas.addOrRemoveTag(context, "company", urlOrId, tag, true);
   },
 });
+
+/* ------------------------------ Custom Fields ----------------------------- */
+
+pack.addFormula({
+  name: "UpdateOppCustomField",
+  description: "Update the value of a custom field on a Copper Opportunity",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the opportunity",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fieldName",
+      description: "The name of the custom field",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "newValue",
+      description: "The value to set the custom field to",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+  isAction: true,
+  execute: async function ([urlOrId, fieldName, newValue], context) {
+    return formulas.updateCustomField(
+      context,
+      "opportunity",
+      urlOrId,
+      fieldName,
+      newValue
+    );
+  },
+});
+
+pack.addFormula({
+  name: "UpdateCompanyCustomField",
+  description: "Update the value of a custom field on a Copper Company",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the company",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fieldName",
+      description: "The name of the custom field",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "newValue",
+      description: "The value to set the custom field to",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+  isAction: true,
+  execute: async function ([urlOrId, fieldName, newValue], context) {
+    return formulas.updateCustomField(
+      context,
+      "company",
+      urlOrId,
+      fieldName,
+      newValue
+    );
+  },
+});
+
+pack.addFormula({
+  name: "UpdatePersonCustomField",
+  description: "Update the value of a custom field on a Copper Person",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "urlOrId",
+      description: "The URL or ID of the pesron",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fieldName",
+      description: "The name of the custom field",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "newValue",
+      description: "The value to set the custom field to",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: schemas.OpportunitySchema,
+  isAction: true,
+  execute: async function ([urlOrId, fieldName, newValue], context) {
+    return formulas.updateCustomField(
+      context,
+      "person",
+      urlOrId,
+      fieldName,
+      newValue
+    );
+  },
+});
