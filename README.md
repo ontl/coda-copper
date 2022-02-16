@@ -7,3 +7,5 @@ This pack lets users work with their [Copper](https://copper.com) data inside [C
 You're looking at the source code for the pack. Pull requests are welcome.
 
 If you just want to use the pack, [get started here!](https://coda.io/@nickhe/copper-pack-for-coda)
+
+This project is licensed under the terms of the MIT license.
