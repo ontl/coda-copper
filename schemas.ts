@@ -211,7 +211,7 @@ export const PersonSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
   id: "personId",
   primary: "fullName",
-  featured: ["title", "company", "assignee", "copperUrl"],
+  featured: ["title", "company", "primaryEmail", "assignee", "copperUrl"],
   identity: { name: "Person" },
   properties: {
     fullName: {
@@ -251,6 +251,11 @@ export const PersonSchema = coda.makeObjectSchema({
     details: {
       type: coda.ValueType.String,
       description: "Details",
+    },
+    primaryEmail: {
+      type: coda.ValueType.String,
+      description: "Primary email",
+      fromKey: "primary_email",
     },
     emails: {
       type: coda.ValueType.Array,

@@ -311,6 +311,12 @@ export function enrichPersonResponse(
 ) {
   person.fullAddress = concatenateAddress(person.address);
   person.url = getCopperUrl(copperAccountId, "contact", person.id);
+  // Find the best email to feature as the primary email. First try to find
+  // one that's labeled with category "work"; otherwise, just use the first one.
+  person.primaryEmail =
+    person.emails.find(
+      (email: types.EmailApiProperty) => email.category === "work"
+    ) || person.emails[0];
   // Prepare reference to companies sync table
   if (person.company_id) {
     person.company = {
