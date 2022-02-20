@@ -316,7 +316,7 @@ export function enrichPersonResponse(
   person.primaryEmail =
     person.emails.find(
       (email: types.EmailApiProperty) => email.category === "work"
-    ) || person.emails[0];
+    )?.email || person.emails[0]?.email;
   // Prepare reference to companies sync table
   if (person.company_id) {
     person.company = {

@@ -255,7 +255,6 @@ export const PersonSchema = coda.makeObjectSchema({
     primaryEmail: {
       type: coda.ValueType.String,
       description: "Primary email",
-      fromKey: "primary_email",
     },
     emails: {
       type: coda.ValueType.Array,
