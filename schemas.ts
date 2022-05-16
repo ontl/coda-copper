@@ -12,14 +12,14 @@ const CopperUserSchema = coda.makeObjectSchema({
     name: { type: coda.ValueType.String },
     copperUserId: { type: coda.ValueType.String },
   },
-  primary: "name",
-  id: "email",
+  displayProperty: "name",
+  idProperty: "email",
 });
 
 const PhoneNumberSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  primary: "number",
-  id: "number",
+  displayProperty: "number",
+  idProperty: "number",
   properties: {
     number: {
       type: coda.ValueType.String,
@@ -34,8 +34,8 @@ const PhoneNumberSchema = coda.makeObjectSchema({
 
 const EmailAddressSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  primary: "email",
-  id: "email",
+  displayProperty: "email",
+  idProperty: "email",
   properties: {
     email: {
       type: coda.ValueType.String,
@@ -50,8 +50,8 @@ const EmailAddressSchema = coda.makeObjectSchema({
 
 const SocialSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  primary: "category",
-  id: "url",
+  displayProperty: "category",
+  idProperty: "url",
   properties: {
     url: {
       type: coda.ValueType.String,
@@ -67,8 +67,8 @@ const SocialSchema = coda.makeObjectSchema({
 
 const WebsiteSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  primary: "url",
-  id: "url",
+  displayProperty: "url",
+  idProperty: "url",
   properties: {
     url: {
       type: coda.ValueType.String,
@@ -88,9 +88,9 @@ const WebsiteSchema = coda.makeObjectSchema({
 
 export const CompanySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  id: "companyId",
-  primary: "companyName",
-  featured: ["fullAddress", "copperUrl", "websites"],
+  idProperty: "companyId",
+  displayProperty: "companyName",
+  featuredProperties: ["fullAddress", "copperUrl", "websites"],
   identity: { name: "Company" },
   properties: {
     companyName: {
@@ -209,9 +209,15 @@ export const CompanyReferenceSchema =
 
 export const PersonSchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  id: "personId",
-  primary: "fullName",
-  featured: ["title", "company", "primaryEmail", "assignee", "copperUrl"],
+  idProperty: "personId",
+  displayProperty: "fullName",
+  featuredProperties: [
+    "title",
+    "company",
+    "primaryEmail",
+    "assignee",
+    "copperUrl",
+  ],
   identity: { name: "Person" },
   properties: {
     fullName: {
@@ -355,9 +361,9 @@ export const PersonReferenceSchema =
 
 export const OpportunitySchema = coda.makeObjectSchema({
   type: coda.ValueType.Object,
-  id: "opportunityId",
-  primary: "opportunityName",
-  featured: [
+  idProperty: "opportunityId",
+  displayProperty: "opportunityName",
+  featuredProperties: [
     "company",
     "primaryContact",
     "status",
@@ -592,9 +598,9 @@ export async function getSchemaWithCustomFields(
 
   let schema = coda.makeObjectSchema({
     properties: properties,
-    primary: staticSchema.primary,
-    id: staticSchema.id,
-    featured: staticSchema.featured,
+    displayProperty: staticSchema.displayProperty,
+    idProperty: staticSchema.idProperty,
+    featuredProperties: staticSchema.featuredProperties,
     identity: staticSchema.identity,
   });
 
