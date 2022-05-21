@@ -26,16 +26,18 @@ export async function callApi(
   // https://coda.github.io/packs-sdk/reference/sdk/interfaces/CustomAuthentication/
   const apiKeyToken = "{{apiKey-" + context.invocationToken + "}}";
   const emailToken = "{{email-" + context.invocationToken + "}}";
+  let url = constants.BASE_URL + endpoint;
+  if (method === "GET") url = coda.withQueryParams(url, payload);
   const response = await context.fetcher.fetch({
     method: method,
-    url: constants.BASE_URL + endpoint,
+    url: url,
     headers: {
       "X-PW-Application": "developer_api",
       "Content-Type": "application/json",
       "X-PW-UserEmail": emailToken,
       "X-PW-AccessToken": apiKeyToken,
     },
-    body: JSON.stringify(payload),
+    body: method != "GET" ? JSON.stringify(payload) : undefined, // only include body if it's a POST or PUT
     cacheTtlSecs: cacheTtlSecs,
   });
   return response;

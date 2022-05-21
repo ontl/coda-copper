@@ -1,5 +1,5 @@
 export const BASE_URL = "https://api.copper.com/developer_api/v1/";
-export const PAGE_SIZE = 25; // max accepted by the API is 200, but that can crash Pack execution
+export const PAGE_SIZE = 50; // max accepted by the API is 200, but that can crash Pack execution
 export const STATUS_OPTIONS = ["Open", "Won", "Lost", "Abandoned"];
 export const RECORD_TYPES = [
   // Copper refers to these record types differently in different contexts. For example,
