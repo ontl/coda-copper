@@ -8,7 +8,11 @@ import * as helpers from "./helpers";
 const CopperUserSchema = coda.makeObjectSchema({
   codaType: coda.ValueHintType.Person,
   properties: {
-    email: { type: coda.ValueType.String, required: true },
+    email: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Email,
+      required: true,
+    },
     name: { type: coda.ValueType.String },
     copperUserId: { type: coda.ValueType.String },
   },
@@ -39,6 +43,7 @@ const EmailAddressSchema = coda.makeObjectSchema({
   properties: {
     email: {
       type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Email,
       description: "Email address",
     },
     category: {
@@ -92,6 +97,7 @@ export const CompanySchema = coda.makeObjectSchema({
   displayProperty: "companyName",
   featuredProperties: ["fullAddress", "copperUrl", "websites"],
   identity: { name: "Company" },
+  includeUnknownProperties: true,
   properties: {
     companyName: {
       type: coda.ValueType.String,
@@ -219,6 +225,7 @@ export const PersonSchema = coda.makeObjectSchema({
     "copperUrl",
   ],
   identity: { name: "Person" },
+  includeUnknownProperties: true,
   properties: {
     fullName: {
       type: coda.ValueType.String,
@@ -260,6 +267,7 @@ export const PersonSchema = coda.makeObjectSchema({
     },
     primaryEmail: {
       type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Email,
       description: "Primary email",
     },
     emails: {
@@ -371,6 +379,7 @@ export const OpportunitySchema = coda.makeObjectSchema({
     "copperUrl",
   ],
   identity: { name: "Opportunity" },
+  includeUnknownProperties: true,
   properties: {
     opportunityName: {
       type: coda.ValueType.String,
@@ -511,6 +520,7 @@ export async function getSchemaWithCustomFields(
   context: coda.ExecutionContext,
   recordType: "person" | "company" | "opportunity"
 ) {
+  console.log("Getting schema with custom fields for ", recordType);
   // First, load up the appropriate static schema, which we'll add on to
   let staticSchema: coda.Schema;
   switch (recordType) {
@@ -604,6 +614,7 @@ export async function getSchemaWithCustomFields(
     identity: staticSchema.identity,
   });
 
+  console.log("Returning schema: ", JSON.stringify(schema));
   // Return an array schema as the result.
   return coda.makeSchema({
     type: coda.ValueType.Array,

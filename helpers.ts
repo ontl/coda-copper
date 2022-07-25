@@ -1,5 +1,6 @@
 import * as coda from "@codahq/packs-sdk";
 import * as constants from "./constants";
+import * as schemas from "./schemas";
 import type * as types from "./types";
 
 /* -------------------------------------------------------------------------- */
@@ -63,7 +64,7 @@ export async function callApiBasicCached(
     endpoint,
     "GET",
     { page_size: constants.PAGE_SIZE },
-    60 * 60 // cache for 1 hour
+    60 * 5 // cache for 5 minutes
   );
   return response.body;
 }
@@ -118,7 +119,7 @@ export function getRecordApiEndpoint(
   id: string
 ) {
   return (
-    constants.RECORD_TYPES.find((type) => type.primary === recordType).plural +
+    constants.RECORD_TYPES.find((type) => type.primary === recordType)?.plural +
     "/" +
     id
   );
@@ -228,6 +229,36 @@ export function humanReadableList(
   );
 }
 
+/**
+ * Takes an api response, and prunes it down to just the fields that are defined
+ * in the schema for the sync table. We're mimicking what's done automatically with
+ * schemas (but we need to do this manually e.g. when returning a dynamic-schema'd
+ * object from an action formula)
+ * @param record A record (e.g. an api resonse) object that has extraneous properties
+ * @param schema A coda schema object defining the properties that should be kept
+ * @param additionalKeys Any additional dynamic keys that should be kept
+ * @returns A pruned version of the record
+ */
+export function pruneObjectToSchema(
+  record: Record<string, any>,
+  schema,
+  additionalKeys?: string[]
+): types.ApiResponse {
+  let props: coda.ObjectSchemaProperties = schema.properties;
+  let keys = Object.entries(props).map(([key, prop]) => {
+    return prop.fromKey || key;
+  });
+  if (additionalKeys) {
+    keys = keys.concat(additionalKeys);
+  }
+  return Object.entries(record).reduce((result, [key, value]) => {
+    if (keys.includes(key)) {
+      result[key] = value;
+    }
+    return result;
+  }, {});
+}
+
 /* -------------------------------------------------------------------------- */
 /*                           API Response Formatters                          */
 /* -------------------------------------------------------------------------- */
@@ -241,8 +272,8 @@ export function enrichOpportunityResponse(
   copperAccountId: string,
   users: types.CopperUserApiResponse[],
   pipelines: types.PipelineApiResponse[],
-  customerSources: types.BasicApiResponse[],
-  lossReasons: types.BasicApiResponse[],
+  customerSources: types.ApiResponse[],
+  lossReasons: types.ApiResponse[],
   customFieldDefinitions?: types.CustomFieldDefinitionApiResponse[],
   // references to other tables only work in sync tables; don't add them for column formats
   withReferences: boolean = false
@@ -261,7 +292,7 @@ export function enrichOpportunityResponse(
     (pipeline) => pipeline.id == opportunity.pipeline_id
   );
   opportunity.pipeline = pipeline?.name;
-  opportunity.pipelineStage = pipeline.stages.find(
+  opportunity.pipelineStage = pipeline?.stages.find(
     (stage) => stage.id == opportunity.pipeline_stage_id
   )?.name;
   // Match to customer sources
@@ -273,14 +304,14 @@ export function enrichOpportunityResponse(
     (reason) => reason.id == opportunity.loss_reason_id
   )?.name;
   // Process custom fields
-  if (customFieldDefinitions && opportunity.custom_fields)
-    opportunity = Object.assign(
-      opportunity,
-      prepareCustomFieldsOnRecord(
-        customFieldDefinitions,
-        opportunity.custom_fields
-      )
+  let customFields = {};
+  if (customFieldDefinitions && opportunity.custom_fields) {
+    customFields = prepareCustomFieldsOnRecord(
+      customFieldDefinitions,
+      opportunity.custom_fields
     );
+    opportunity = Object.assign(opportunity, customFields);
+  }
 
   // If we're enriching this record for a sync table, we want to prepare references
   // to other tables like the related Comapny and Person (contact). This referencing
@@ -301,14 +332,18 @@ export function enrichOpportunityResponse(
       };
     }
   }
-  return opportunity;
+  return pruneObjectToSchema(
+    opportunity,
+    schemas.OpportunitySchema,
+    Object.keys(customFields)
+  );
 }
 
 export function enrichPersonResponse(
   person: any,
   copperAccountId: string,
   users: types.CopperUserApiResponse[],
-  contactTypes: types.BasicApiResponse[],
+  contactTypes: types.ApiResponse[],
   customFieldDefinitions?: types.CustomFieldDefinitionApiResponse[]
 ) {
   person.fullAddress = concatenateAddress(person.address);
@@ -342,14 +377,21 @@ export function enrichPersonResponse(
       (contactType) => contactType.id == person.contact_type_id
     )?.name;
   }
-  if (customFieldDefinitions && person.custom_fields)
-    // Merge in any custom fields
-    person = Object.assign(
-      person,
-      prepareCustomFieldsOnRecord(customFieldDefinitions, person.custom_fields)
+  // Process custom fields
+  let customFields = {};
+  if (customFieldDefinitions && person.custom_fields) {
+    customFields = prepareCustomFieldsOnRecord(
+      customFieldDefinitions,
+      person.custom_fields
     );
+    person = Object.assign(person, customFields);
+  }
 
-  return person;
+  return pruneObjectToSchema(
+    person,
+    schemas.PersonSchema,
+    Object.keys(customFields)
+  );
 }
 
 export function enrichCompanyResponse(
@@ -370,13 +412,19 @@ export function enrichCompanyResponse(
       name: assignee?.name,
     };
   }
-  if (customFieldDefinitions && company.custom_fields)
-    company = Object.assign(
-      company,
-      prepareCustomFieldsOnRecord(customFieldDefinitions, company.custom_fields)
+  let customFields = {};
+  if (customFieldDefinitions && company.custom_fields) {
+    customFields = prepareCustomFieldsOnRecord(
+      customFieldDefinitions,
+      company.custom_fields
     );
-
-  return company;
+    company = Object.assign(company, customFields);
+  }
+  return pruneObjectToSchema(
+    company,
+    schemas.CompanySchema,
+    Object.keys(customFields)
+  );
 }
 
 // FETCH VERSIONS: Enrich from just a record API response, by fetching the supporting data
@@ -398,17 +446,20 @@ export async function enrichPersonResponseWithFetches(
     users, // Copper users who might be "assignees"
     copperAccount, // for building Copper URLs
     contactTypes,
+    customFieldDefinitions,
   ] = await Promise.all([
     getCopperUsers(context),
     callApiBasicCached(context, "account"),
     callApiBasicCached(context, "contact_types"),
+    callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let enrichedPerson = await enrichPersonResponse(
     person,
     copperAccount.id,
     users,
-    contactTypes
+    contactTypes,
+    customFieldDefinitions
   );
 
   return enrichedPerson;
@@ -419,15 +470,17 @@ export async function enrichCompanyResponseWithFetches(
   company: types.CompanyApiResponse
 ) {
   // Fetch the enrichment data we'll need
-  const [users, copperAccount] = await Promise.all([
+  const [users, copperAccount, customFieldDefinitions] = await Promise.all([
     getCopperUsers(context),
     callApiBasicCached(context, "account"),
+    callApiBasicCached(context, "custom_field_definitions"),
   ]);
 
   let enrichedCompany = await enrichCompanyResponse(
     company,
     copperAccount.id,
-    users
+    users,
+    customFieldDefinitions
   );
 
   return enrichedCompany;
@@ -438,14 +491,21 @@ export async function enrichOpportunityResponseWithFetches(
   opportunity: types.OpportunityApiResponse
 ) {
   // Fetch the enrichment data we'll need
-  const [users, pipelines, customerSources, lossReasons, copperAccount] =
-    await Promise.all([
-      getCopperUsers(context),
-      callApiBasicCached(context, "pipelines"),
-      callApiBasicCached(context, "customer_sources"),
-      callApiBasicCached(context, "loss_reasons"),
-      callApiBasicCached(context, "account"),
-    ]);
+  const [
+    users,
+    pipelines,
+    customerSources,
+    lossReasons,
+    copperAccount,
+    customFieldDefinitions,
+  ] = await Promise.all([
+    getCopperUsers(context),
+    callApiBasicCached(context, "pipelines"),
+    callApiBasicCached(context, "customer_sources"),
+    callApiBasicCached(context, "loss_reasons"),
+    callApiBasicCached(context, "account"),
+    callApiBasicCached(context, "custom_field_definitions"),
+  ]);
 
   let enrichedOpportunity = await enrichOpportunityResponse(
     opportunity,
@@ -453,7 +513,8 @@ export async function enrichOpportunityResponseWithFetches(
     users,
     pipelines,
     customerSources,
-    lossReasons
+    lossReasons,
+    customFieldDefinitions
   );
 
   return enrichedOpportunity;

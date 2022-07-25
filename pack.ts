@@ -8,6 +8,7 @@ import * as coda from "@codahq/packs-sdk";
 import * as schemas from "./schemas";
 import * as constants from "./constants";
 import * as formulas from "./formulas";
+import * as helpers from "./helpers";
 
 export const pack = coda.newPack();
 
@@ -31,6 +32,9 @@ pack.setUserAuthentication({
   ],
   instructionsUrl:
     "https://coda.io/@nickhe/copper-pack-for-coda/getting-started-2",
+  getConnectionName: async function (context) {
+    return helpers.callApiBasicCached(context, "account")?.name;
+  },
 });
 
 /* -------------------------------------------------------------------------- */
@@ -223,7 +227,7 @@ pack.addFormula({
       description: "If changing to Lost, the reason for the loss",
       optional: true,
       autocomplete: async function (context) {
-        return formulas.getLossReasons(context);
+        return formulas.autocompleteLossReasons(context);
       },
     }),
   ],
@@ -254,7 +258,7 @@ pack.addFormula({
       name: "stage",
       description: "The stage to move the opportunity to",
       autocomplete: async function (context, search, parameters) {
-        return formulas.getPipelineStages(context, parameters.urlOrId);
+        return formulas.autocompletePipelineStages(context, parameters.urlOrId);
       },
     }),
   ],
@@ -309,7 +313,7 @@ pack.addFormula({
       name: "assigneeEmail",
       description: "The email address of the person you want to assign it to",
       autocomplete: async function (context) {
-        return formulas.getUsers(context);
+        return formulas.autocompleteUsers(context);
       },
     }),
   ],
@@ -339,6 +343,9 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "assigneeEmail",
       description: "The email address of the assignee (your colleague)",
+      autocomplete: async function (context) {
+        return formulas.autocompleteUsers(context);
+      },
     }),
   ],
   resultType: coda.ValueType.Object,
@@ -362,6 +369,9 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "assigneeEmail",
       description: "The email address of the person you want to assign it to",
+      autocomplete: async function (context) {
+        return formulas.autocompleteUsers(context);
+      },
     }),
   ],
   resultType: coda.ValueType.Object,
@@ -529,6 +539,9 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "fieldName",
       description: "The name of the custom field",
+      autocomplete: async function (context) {
+        return formulas.autocompleteCustomFields(context, "opportunity");
+      },
     }),
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -563,6 +576,9 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "fieldName",
       description: "The name of the custom field",
+      autocomplete: async function (context) {
+        return formulas.autocompleteCustomFields(context, "company");
+      },
     }),
     coda.makeParameter({
       type: coda.ParameterType.String,
@@ -597,6 +613,9 @@ pack.addFormula({
       type: coda.ParameterType.String,
       name: "fieldName",
       description: "The name of the custom field",
+      autocomplete: async function (context) {
+        return formulas.autocompleteCustomFields(context, "person");
+      },
     }),
     coda.makeParameter({
       type: coda.ParameterType.String,

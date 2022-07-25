@@ -2,6 +2,7 @@ import * as coda from "@codahq/packs-sdk";
 import * as constants from "./constants";
 import * as types from "./types";
 import * as helpers from "./helpers";
+import * as schemas from "./schemas";
 
 /* -------------------------------------------------------------------------- */
 /*                            Sync Table Functions                            */
@@ -58,7 +59,7 @@ export async function syncOpportunities(context: coda.SyncExecutionContext) {
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
-  let nextContinuation = {};
+  let nextContinuation;
   if (opportunities.length == constants.PAGE_SIZE)
     nextContinuation = { pageNumber: pageNumber + 1 };
 
@@ -73,6 +74,8 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   // start at page 1.
   let pageNumber: number =
     (context.sync.continuation?.pageNumber as number) || 1;
+
+  console.log("Syncing companies page " + pageNumber);
 
   // Get a page of results, the Copper account info we'll need for building URLs,
   // the list of users who might be "assignees", and any custom fields
@@ -102,7 +105,7 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
-  let nextContinuation = undefined;
+  let nextContinuation;
   if (companies.length == constants.PAGE_SIZE)
     nextContinuation = { pageNumber: pageNumber + 1 };
 
@@ -147,7 +150,7 @@ export async function syncPeople(context: coda.SyncExecutionContext) {
 
   // If we got a full page of results, that means there are probably more results
   // on the next page. Set up a continuation to grab the next page if so.
-  let nextContinuation = undefined;
+  let nextContinuation;
   if (people.length == constants.PAGE_SIZE)
     nextContinuation = { pageNumber: pageNumber + 1 };
 
@@ -198,7 +201,7 @@ export async function getOpportunity(
     pipelines,
     customerSources,
     lossReasons,
-    null, // we can't do custom fields on regular formulas, cause of static schema
+    undefined, // we can't do custom fields on regular formulas, cause of static schema
     false // don't include references to Person and Company sync tables
   );
 
@@ -558,21 +561,21 @@ export async function updateCustomField(
 /*                                Autocomplete                                */
 /* -------------------------------------------------------------------------- */
 
-export async function getLossReasons(
+export async function autocompleteLossReasons(
   context: coda.ExecutionContext
 ): Promise<string[]> {
   let response = await helpers.callApiBasicCached(context, "loss_reasons");
   return response.map((reason) => reason.name);
 }
 
-export async function getUsers(
+export async function autocompleteUsers(
   context: coda.ExecutionContext
 ): Promise<string[]> {
   let response = await helpers.getCopperUsers(context);
   return response.map((user) => user.email);
 }
 
-export async function getPipelineStages(
+export async function autocompletePipelineStages(
   context: coda.ExecutionContext,
   urlOrId: string
 ): Promise<string[]> {
@@ -590,4 +593,17 @@ export async function getPipelineStages(
         (pipeline.id as string) === (opportunity.pipeline_id as string)
     )
     .stages.map((stage) => stage.name);
+}
+
+export async function autocompleteCustomFields(
+  context: coda.ExecutionContext,
+  recordType: "opportunity" | "person" | "company"
+): Promise<string[]> {
+  let response = await helpers.callApiBasicCached(
+    context,
+    "custom_field_definitions"
+  );
+  return response
+    .filter((fieldDef) => fieldDef.available_on.includes(recordType))
+    .map((fieldDef) => fieldDef.name);
 }

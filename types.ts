@@ -36,9 +36,12 @@ export interface EmailApiProperty {
 }
 
 // Complete API responses
-export interface OpportunityApiResponse {
+export interface ApiResponse {
   id?: string;
-  name: string;
+  name?: string;
+  [otherOptions: string]: any;
+}
+export interface OpportunityApiResponse extends ApiResponse {
   assignee_id?: string;
   close_date?: string; // MM/DD/YYYY or DD/MM/YYYY format;
   // (most other date fields are unix epoch, but not this one)
@@ -60,9 +63,7 @@ export interface OpportunityApiResponse {
   custom_fields?: CustomFieldApiProperty[];
 }
 
-export interface CompanyApiResponse {
-  id?: string;
-  name: string;
+export interface CompanyApiResponse extends ApiResponse {
   address?: AddressApiProperty;
   assignee_id?: string;
   contact_type_id?: string;
@@ -77,9 +78,7 @@ export interface CompanyApiResponse {
   custom_fields?: CustomFieldApiProperty[];
 }
 
-export interface PersonApiResponse {
-  id?: string;
-  name: string;
+export interface PersonApiResponse extends ApiResponse {
   address?: AddressApiProperty;
   assignee_id?: string;
   company_id?: string;
@@ -97,15 +96,8 @@ export interface PersonApiResponse {
   custom_fields?: CustomFieldApiProperty[];
 }
 
-export interface CopperUserApiResponse {
-  id: string;
-  name: string;
+export interface CopperUserApiResponse extends ApiResponse {
   email: string;
-}
-
-export interface BasicApiResponse {
-  id: string;
-  name: string;
 }
 
 export interface PipelineApiResponse {
