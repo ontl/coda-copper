@@ -75,8 +75,6 @@ export async function syncCompanies(context: coda.SyncExecutionContext) {
   let pageNumber: number =
     (context.sync.continuation?.pageNumber as number) || 1;
 
-  console.log("Syncing companies page " + pageNumber);
-
   // Get a page of results, the Copper account info we'll need for building URLs,
   // the list of users who might be "assignees", and any custom fields
   const [response, copperAccount, users, customFieldDefinitions] =
@@ -549,6 +547,7 @@ export async function updateCustomField(
   // Update on the API
   let response = await helpers.callApi(context, endpoint, "PUT", {
     custom_fields: customFieldValues,
+    custom_field_computed_values: true,
   });
   return await helpers.enrichResponseWithFetches(
     context,

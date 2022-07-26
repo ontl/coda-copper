@@ -588,7 +588,7 @@ pack.addFormula({
     }),
   ],
   resultType: coda.ValueType.Object,
-  schema: schemas.OpportunitySchema,
+  schema: schemas.CompanySchema,
   isAction: true,
   execute: async function ([urlOrId, fieldName, newValue], context) {
     return formulas.updateCustomField(
@@ -625,7 +625,7 @@ pack.addFormula({
     }),
   ],
   resultType: coda.ValueType.Object,
-  schema: schemas.OpportunitySchema,
+  schema: schemas.PersonSchema,
   isAction: true,
   execute: async function ([urlOrId, fieldName, newValue], context) {
     return formulas.updateCustomField(

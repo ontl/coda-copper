@@ -184,7 +184,8 @@ function prepareCustomFieldsOnRecord(
       (customField) =>
         customField.id === customFieldEntry.custom_field_definition_id
     )?.name;
-    preparedFields[fieldName] = customFieldEntry.computed_value;
+    preparedFields[fieldName] =
+      customFieldEntry.computed_value || customFieldEntry.value; // .value is a fallback in case .computed_value isn't working
   }
   return preparedFields;
 }
@@ -304,7 +305,7 @@ export function enrichOpportunityResponse(
     (reason) => reason.id == opportunity.loss_reason_id
   )?.name;
   // Process custom fields
-  let customFields = {};
+  let customFields;
   if (customFieldDefinitions && opportunity.custom_fields) {
     customFields = prepareCustomFieldsOnRecord(
       customFieldDefinitions,
