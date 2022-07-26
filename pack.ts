@@ -33,7 +33,8 @@ pack.setUserAuthentication({
   instructionsUrl:
     "https://coda.io/@nickhe/copper-pack-for-coda/getting-started-2",
   getConnectionName: async function (context) {
-    return helpers.callApiBasicCached(context, "account")?.name;
+    const account = await helpers.callApiBasicCached(context, "account");
+    return account.name;
   },
 });
 
