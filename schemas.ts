@@ -10,7 +10,6 @@ const CopperUserSchema = coda.makeObjectSchema({
   properties: {
     email: {
       type: coda.ValueType.String,
-      codaType: coda.ValueHintType.Email,
       required: true,
     },
     name: { type: coda.ValueType.String },
