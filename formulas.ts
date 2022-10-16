@@ -318,7 +318,10 @@ export async function updateOpportunityStatus(
     context,
     "opportunities/" + opportunityId.id,
     "PUT",
-    payload
+    {
+      ...payload,
+      custom_field_computed_values: true,
+    }
   );
 
   return await helpers.enrichOpportunityResponseWithFetches(
@@ -363,7 +366,10 @@ export async function updateOpportunityStage(
     context,
     "opportunities/" + opportunityId.id,
     "PUT",
-    { pipeline_stage_id: newStage.id }
+    {
+      pipeline_stage_id: newStage.id,
+      custom_field_computed_values: true,
+    }
   );
   return await helpers.enrichOpportunityResponseWithFetches(
     context,
@@ -386,7 +392,7 @@ export async function renameOpportunity(
     context,
     "opportunities/" + opportunityId.id,
     "PUT",
-    { name: newName }
+    { name: newName, custom_field_computed_values: true }
   );
   return await helpers.enrichOpportunityResponseWithFetches(
     context,
@@ -424,7 +430,10 @@ export async function assignRecord(
   let endpoint = helpers.getRecordApiEndpoint(recordType, recordId.id);
   // Update the record (the API will respond with the updated record, so
   // we'll hang onto that too)
-  let response = await helpers.callApi(context, endpoint, "PUT", payload);
+  let response = await helpers.callApi(context, endpoint, "PUT", {
+    ...payload,
+    custom_field_computed_values: true,
+  });
   // Enrich the updated record and prepare it for insertion back into the sync table
   return await helpers.enrichResponseWithFetches(
     context,
@@ -456,6 +465,7 @@ export async function addOrRemoveTag(
 
   let response = await helpers.callApi(context, endpoint, "PUT", {
     tags: tags,
+    custom_field_computed_values: true,
   });
   return await helpers.enrichResponseWithFetches(
     context,
