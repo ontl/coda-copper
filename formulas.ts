@@ -454,7 +454,13 @@ export async function addOrRemoveTag(
 
   let endpoint = helpers.getRecordApiEndpoint(recordType, recordId.id);
 
-  let existingResponse = await helpers.callApi(context, endpoint, "GET");
+  let existingResponse = await helpers.callApi(
+    context,
+    endpoint,
+    "GET",
+    undefined,
+    0
+  );
   let tags: string[] = existingResponse.body.tags;
 
   if (remove) {
